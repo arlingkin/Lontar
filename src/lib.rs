@@ -2,6 +2,7 @@
 
 pub mod kesalahan;
 pub mod lexer;
+pub mod parser;
 
 pub const NAMA: &str = "Lontar";
 pub const VERSI: &str = env!("CARGO_PKG_VERSION");
