@@ -1,5 +1,8 @@
 //! Inti kompiler Lontar. Tahap lexer, parser, dst. ditambahkan bertahap.
 
+pub mod kesalahan;
+pub mod lexer;
+
 pub const NAMA: &str = "Lontar";
 pub const VERSI: &str = env!("CARGO_PKG_VERSION");
 

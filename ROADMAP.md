@@ -1,7 +1,7 @@
 # ROADMAP
 ## Status singkat
-M0 (fondasi) selesai dan terverifikasi: `cargo fmt --check`, `cargo build`, `cargo test` lulus (cargo 1.75).
-Berikutnya lexer (M1).
+M0 (fondasi) dan M1 (lexer) selesai dan terverifikasi: `cargo fmt --check`, `cargo build` (0 warning), `cargo test` (14 tes) lulus.
+Berikutnya parser ekspresi, `let`, dan `fn` (M2).
 ## Keputusan desain
 - Implementasi kompiler ditulis dalam Rust; bahasa Lontar mengambil sintaks yang familier dari Rust tanpa borrow checker dan lifetime.
 - Pipeline: sumber -> lexer -> parser/AST -> pemeriksa tipe -> IR -> backend.
@@ -14,12 +14,14 @@ Berikutnya lexer (M1).
 - [x] 2026-11-25: M0 kode: `Cargo.toml`, `src/lib.rs` (`salam()`), `src/main.rs`, `tests/dasar.rs`, `.gitignore`.
 - [x] 2026-11-25: M0 verifikasi: fmt bersih, build sukses, 2 tes lulus, biner mencetak `Lontar v0.1.0`; `Cargo.lock` dicommit.
 - [x] 2026-11-25: `CLAUDE.md` diselaraskan dengan keputusan Rust (sebelumnya menyebut Python).
+- [x] 2026-11-25: M1 lexer: `src/lexer.rs` (`tokenisasi`, `Token`, `Jenis`) dan `src/kesalahan.rs`. Mendukung kata kunci, identifier, Int/Float, operator, pemisah, komentar `//`, posisi baris:kolom, kesalahan berbahasa Indonesia. 13 tes unit lulus.
 ## Berikutnya
-1. M1: Lexer minimal (angka, identifier, kata kunci, operator, posisi baris:kolom) dan tes token.
-2. M2: Parser ekspresi, `let`, dan `fn`.
-3. M3: Pemeriksa tipe dasar.
-4. M4: IR sederhana.
+1. M2: Parser ekspresi, `let`, dan `fn`.
+2. M3: Pemeriksa tipe dasar.
+3. M4: IR sederhana.
 ## Ide / Utang teknis
+- Lexer belum mengenal string, char, `/* */`, pemisah angka `1_000`, dan escape; tambahkan saat dibutuhkan parser.
+- Titik koma opsional: token belum membawa info "ada baris baru sebelum token ini"; putuskan di M2 (tambah flag di `Token` atau hitung dari `baris`).
 - Evaluasi backend pertama setelah IR; JavaScript tetap kandidat awal.
 - Tentukan cakupan tipe awal dan strategi pengelolaan memori sebelum implementasi runtime.
 - Tambahkan CI GitHub Actions (`cargo test`) agar verifikasi tidak bergantung pada sandbox.
