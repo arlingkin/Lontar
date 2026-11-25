@@ -16,10 +16,11 @@ aturan utama. Balas dalam bahasa Indonesia.
 
 # ARSITEKTUR
 Sumber -> Lexer -> Parser (AST) -> Type checker -> IR sederhana -> Backend.
-- Kompiler ditulis dalam Python tanpa dependensi (mudah dites di sandbox).
-  Self-hosting urusan belakangan.
+- Kompiler ditulis dalam Rust tanpa dependensi eksternal (dites dengan
+  `cargo test`). Self-hosting urusan belakangan.
 - Backend ditambah satu per satu, urutan: JavaScript, Python, C, Go, WASM(WAT).
-- Setiap tahap punya tes unittest sendiri.
+- Setiap tahap punya tes sendiri; item ROADMAP hanya dicentang `[x]` setelah
+  `cargo build` dan `cargo test` benar-benar lulus.
 
 # ATURAN KERJA (WAJIB)
 1. Mulai setiap sesi dengan membaca ROADMAP.md yang saya tempel. Jika belum
@@ -42,7 +43,7 @@ Format tetap:
 # ROADMAP
 ## Status singkat      (2-3 baris: sudah sampai mana)
 ## Keputusan desain    (daftar keputusan yang sudah final; jangan dibuka ulang)
-## Selesai             (tugas + tanggal)
+## Selesai             (checklist [x] + tanggal)
 ## Berikutnya          (3-5 tugas kecil berurutan, yang pertama = tugas sesi depan)
 ## Ide / Utang teknis
 ```

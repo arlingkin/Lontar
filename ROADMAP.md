@@ -1,7 +1,7 @@
 # ROADMAP
 ## Status singkat
-M0 (fondasi): kerangka crate Rust + tes dasar sudah ditulis, tetapi `cargo test` BELUM dijalankan (sandbox tanpa toolchain Rust).
-Berikutnya memverifikasi M0, lalu lexer (M1).
+M0 (fondasi) selesai dan terverifikasi: `cargo fmt --check`, `cargo build`, `cargo test` lulus (cargo 1.75).
+Berikutnya lexer (M1).
 ## Keputusan desain
 - Implementasi kompiler ditulis dalam Rust; bahasa Lontar mengambil sintaks yang familier dari Rust tanpa borrow checker dan lifetime.
 - Pipeline: sumber -> lexer -> parser/AST -> pemeriksa tipe -> IR -> backend.
@@ -12,15 +12,15 @@ Berikutnya memverifikasi M0, lalu lexer (M1).
 ## Selesai
 - [x] 2026-11-24: Membuat SPEC.md awal dan roadmap proyek.
 - [x] 2026-11-25: M0 kode: `Cargo.toml`, `src/lib.rs` (`salam()`), `src/main.rs`, `tests/dasar.rs`, `.gitignore`.
-- [ ] 2026-11-25: M0 verifikasi: `cargo test` lulus (belum dijalankan).
+- [x] 2026-11-25: M0 verifikasi: fmt bersih, build sukses, 2 tes lulus, biner mencetak `Lontar v0.1.0`; `Cargo.lock` dicommit.
+- [x] 2026-11-25: `CLAUDE.md` diselaraskan dengan keputusan Rust (sebelumnya menyebut Python).
 ## Berikutnya
-1. M0 verifikasi: jalankan `cargo build && cargo test`, commit `Cargo.lock`, centang item di atas.
-2. M1: Lexer minimal (angka, identifier, kata kunci, operator, posisi baris:kolom) dan tes token.
-3. M2: Parser ekspresi, `let`, dan `fn`.
-4. M3: Pemeriksa tipe dasar.
-5. M4: IR sederhana.
+1. M1: Lexer minimal (angka, identifier, kata kunci, operator, posisi baris:kolom) dan tes token.
+2. M2: Parser ekspresi, `let`, dan `fn`.
+3. M3: Pemeriksa tipe dasar.
+4. M4: IR sederhana.
 ## Ide / Utang teknis
 - Evaluasi backend pertama setelah IR; JavaScript tetap kandidat awal.
 - Tentukan cakupan tipe awal dan strategi pengelolaan memori sebelum implementasi runtime.
-- `CLAUDE.md` masih menyebut kompiler ditulis dalam Python; selaraskan dengan keputusan Rust di atas.
 - Tambahkan CI GitHub Actions (`cargo test`) agar verifikasi tidak bergantung pada sandbox.
+- Sandbox: `apt-get install cargo rustfmt` (Rust 1.75, tanpa clippy); kode harus kompatibel Rust 1.75 selama dipakai.
