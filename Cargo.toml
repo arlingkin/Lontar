@@ -1,0 +1,6 @@
+[package]
+name = "lontar"
+version = "0.1.0"
+edition = "2021"
+description = "Bahasa pemrograman Lontar: sintaks mirip Rust, tanpa borrow checker, pesan kesalahan berbahasa Indonesia"
+license = "Apache-2.0"
