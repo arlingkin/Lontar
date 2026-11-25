@@ -1,7 +1,7 @@
 # ROADMAP
 ## Status singkat
-M0 (fondasi) dan M1 (lexer) selesai dan terverifikasi: `cargo fmt --check`, `cargo build` (0 warning), `cargo test` (14 tes) lulus.
-Berikutnya parser ekspresi, `let`, dan `fn` (M2).
+M0 (fondasi), M1 (lexer), dan M2 langkah 1 (parser ekspresi) selesai dan terverifikasi: `cargo fmt --check`, `cargo build` (0 warning), `cargo test` (24 tes) lulus.
+Berikutnya parser `let`, blok, dan `fn` (M2 lanjutan).
 ## Keputusan desain
 - Implementasi kompiler ditulis dalam Rust; bahasa Lontar mengambil sintaks yang familier dari Rust tanpa borrow checker dan lifetime.
 - Pipeline: sumber -> lexer -> parser/AST -> pemeriksa tipe -> IR -> backend.
@@ -15,11 +15,13 @@ Berikutnya parser ekspresi, `let`, dan `fn` (M2).
 - [x] 2026-11-25: M0 verifikasi: fmt bersih, build sukses, 2 tes lulus, biner mencetak `Lontar v0.1.0`; `Cargo.lock` dicommit.
 - [x] 2026-11-25: `CLAUDE.md` diselaraskan dengan keputusan Rust (sebelumnya menyebut Python).
 - [x] 2026-11-25: M1 lexer: `src/lexer.rs` (`tokenisasi`, `Token`, `Jenis`) dan `src/kesalahan.rs`. Mendukung kata kunci, identifier, Int/Float, operator, pemisah, komentar `//`, posisi baris:kolom, kesalahan berbahasa Indonesia. 13 tes unit lulus.
+- [x] 2026-11-25: M2 langkah 1 parser: `src/parser.rs` (`parse_ekspr`, `Ekspr`, `Op`) mendukung literal, nama, negasi, `+ - * / %`, perbandingan, dan kurung; kesalahan berbahasa Indonesia berposisi. 10 tes unit; total 24 tes lulus, fmt bersih, build 0 warning.
 ## Berikutnya
-1. M2: Parser ekspresi, `let`, dan `fn`.
+1. M2 lanjutan: parser `let`, blok, dan `fn` (AST pernyataan).
 2. M3: Pemeriksa tipe dasar.
 3. M4: IR sederhana.
 ## Ide / Utang teknis
+- Parser ekspresi belum mengenal panggilan fungsi, `&&`/`||`/`!`, `if`/blok, dan akses `.`; titik koma opsional belum ditangani.
 - Lexer belum mengenal string, char, `/* */`, pemisah angka `1_000`, dan escape; tambahkan saat dibutuhkan parser.
 - Titik koma opsional: token belum membawa info "ada baris baru sebelum token ini"; putuskan di M2 (tambah flag di `Token` atau hitung dari `baris`).
 - Evaluasi backend pertama setelah IR; JavaScript tetap kandidat awal.
