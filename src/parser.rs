@@ -1,6 +1,7 @@
 //! Parser Lontar (M2): ekspresi (literal, nama, operator, kurung, blok,
-//! panggilan fungsi, `if`/`else`, `while`, `return`, penugasan `x = e`),
-//! pernyataan `let`, dan `fn`. Penugasan berasosiasi kanan dan terendah.
+//! panggilan fungsi, `if`/`else`, `while`, `for x in a..b`, `return`,
+//! penugasan `x = e`), pernyataan `let`, dan `fn`. Penugasan berasosiasi kanan
+//! dan terendah; rentang `a..b`/`a..=b` (tanpa rantai) tepat di atasnya.
 //! Presedensi dari terendah: `||`, `&&`, perbandingan, `+ -`, `* / %`,
 //! unary (`-`, `!`), panggilan, primer. `(` hanya memulai panggilan jika satu
 //! baris dengan token sebelumnya.
@@ -54,6 +55,18 @@ pub enum Ekspr {
     Selama {
         syarat: Box<Ekspr>,
         badan: Blok,
+    },
+    /// `for nama in iter { .. }`; `iter` biasanya `Rentang`.
+    Untuk {
+        nama: String,
+        iter: Box<Ekspr>,
+        badan: Blok,
+    },
+    /// `awal..akhir` (`termasuk` = false) atau `awal..=akhir` (true); kedua ujung wajib.
+    Rentang {
+        awal: Box<Ekspr>,
+        akhir: Box<Ekspr>,
+        termasuk: bool,
     },
     Balik(Option<Box<Ekspr>>),
     /// `sasaran = nilai`; saat ini sasaran selalu `Ekspr::Nama`.
@@ -303,7 +316,7 @@ impl<'a> Parser<'a> {
             return self.balik();
         }
         let awal = self.lihat();
-        let kiri = self.atau()?;
+        let kiri = self.rentang()?;
         if self.lihat().jenis != Jenis::Assign {
             return Ok(kiri);
         }
@@ -320,6 +333,32 @@ impl<'a> Parser<'a> {
             sasaran: Box::new(kiri),
             nilai: Box::new(nilai),
         })
+    }
+
+    /// `a..b` atau `a..=b`; tidak bisa dirantai (`a..b..c` ditolak oleh pemanggil).
+    fn rentang(&mut self) -> Result<Ekspr, Kesalahan> {
+        let awal = self.atau()?;
+        let termasuk = match self.lihat().jenis {
+            Jenis::DotDot => false,
+            Jenis::DotDotEq => true,
+            _ => return Ok(awal),
+        };
+        self.maju();
+        let akhir = self.atau()?;
+        Ok(Ekspr::Rentang {
+            awal: Box::new(awal),
+            akhir: Box::new(akhir),
+            termasuk,
+        })
+    }
+
+    fn untuk(&mut self) -> Result<Ekspr, Kesalahan> {
+        self.maju(); // `for`
+        let nama = self.ident("nama variabel")?;
+        self.harap(Jenis::In, "'in'")?;
+        let iter = Box::new(self.ekspr()?);
+        let badan = self.blok()?;
+        Ok(Ekspr::Untuk { nama, iter, badan })
     }
 
     /// `return [e]`: nilai dilewati jika token berikutnya `;`, `}`, `)`, `,`,
@@ -469,6 +508,7 @@ impl<'a> Parser<'a> {
             }
             Jenis::If => return self.jika(),
             Jenis::While => return self.selama(),
+            Jenis::For => return self.untuk(),
             Jenis::LParen => {
                 self.maju();
                 let e = self.ekspr()?;
@@ -561,6 +601,10 @@ fn deskripsi(j: &Jenis) -> String {
         Jenis::Else => "'else'".to_string(),
         Jenis::While => "'while'".to_string(),
         Jenis::Return => "'return'".to_string(),
+        Jenis::For => "'for'".to_string(),
+        Jenis::In => "'in'".to_string(),
+        Jenis::DotDot => "'..'".to_string(),
+        Jenis::DotDotEq => "'..='".to_string(),
         Jenis::Int(n) => format!("angka '{}'", n),
         Jenis::Float(f) => format!("angka '{}'", f),
         Jenis::Ident(s) => format!("nama '{}'", s),
@@ -1077,5 +1121,90 @@ mod tests {
             parse("if a {}").unwrap(),
             Ekspr::Jika { maka, .. } if maka == kosong()
         ));
+    }
+
+    fn rentang(a: Ekspr, b: Ekspr, termasuk: bool) -> Ekspr {
+        Ekspr::Rentang {
+            awal: Box::new(a),
+            akhir: Box::new(b),
+            termasuk,
+        }
+    }
+
+    #[test]
+    fn untuk_rentang_eksklusif_dan_inklusif() {
+        assert_eq!(
+            parse("for i in 0..n { f(i) }").unwrap(),
+            Ekspr::Untuk {
+                nama: "i".to_string(),
+                iter: Box::new(rentang(int(0), nama("n"), false)),
+                badan: blok_nilai(panggil(nama("f"), vec![nama("i")])),
+            }
+        );
+        let Ekspr::Untuk { iter, .. } = parse("for i in 1..=5 {}").unwrap() else {
+            panic!("diharapkan Untuk");
+        };
+        assert_eq!(*iter, rentang(int(1), int(5), true));
+    }
+
+    #[test]
+    fn rentang_lebih_rendah_dari_aritmetika_dan_logika() {
+        assert_eq!(
+            parse("a + 1..b * 2").unwrap(),
+            rentang(
+                biner(Op::Tambah, nama("a"), int(1)),
+                biner(Op::Kali, nama("b"), int(2)),
+                false
+            )
+        );
+        assert_eq!(
+            parse("a || b..c").unwrap(),
+            rentang(biner(Op::Atau, nama("a"), nama("b")), nama("c"), false)
+        );
+    }
+
+    #[test]
+    fn untuk_bersarang_dan_pernyataan_tanpa_titik_koma() {
+        let b = badan("for i in 0..3 { if i == 1 { return } }\nlet y = 1\ny").unwrap();
+        assert_eq!(b.pernyataan.len(), 2);
+        assert!(matches!(
+            &b.pernyataan[0],
+            Pernyataan::Ekspresi(Ekspr::Untuk { .. })
+        ));
+        assert_eq!(b.nilai.as_deref(), Some(&nama("y")));
+    }
+
+    #[test]
+    fn rentang_tanpa_ujung_ditolak() {
+        let e = parse("1..").unwrap_err();
+        assert_eq!(e.pesan, "diharapkan ekspresi, ditemukan akhir berkas");
+        let e = parse("..3").unwrap_err();
+        assert_eq!(e.pesan, "diharapkan ekspresi, ditemukan '..'");
+    }
+
+    #[test]
+    fn rentang_tidak_bisa_dirantai() {
+        let e = parse("1..2..3").unwrap_err();
+        assert_eq!(e.pesan, "token tidak terduga setelah ekspresi: '..'");
+    }
+
+    #[test]
+    fn untuk_tanpa_in_atau_tanpa_nama_ditolak() {
+        let e = parse("for x 0..3 {}").unwrap_err();
+        assert_eq!(e.pesan, "diharapkan 'in', ditemukan angka '0'");
+        let e = parse("for 1 in a {}").unwrap_err();
+        assert_eq!(e.pesan, "diharapkan nama variabel, ditemukan angka '1'");
+    }
+
+    #[test]
+    fn untuk_tanpa_badan_ditolak() {
+        let e = parse("for i in 0..3").unwrap_err();
+        assert_eq!(e.pesan, "diharapkan '{', ditemukan akhir berkas");
+    }
+
+    #[test]
+    fn rentang_sebagai_sasaran_penugasan_ditolak() {
+        let e = parse("a..b = 1").unwrap_err();
+        assert_eq!(e.pesan, "sasaran penugasan harus berupa nama");
     }
 }
