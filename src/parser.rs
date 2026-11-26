@@ -1,6 +1,8 @@
-//! Parser Lontar (M2): ekspresi (literal, nama, negasi, operator aritmetika
-//! dan perbandingan, kurung, blok), pernyataan `let`, dan `fn`.
-//! Presedensi dari terendah: perbandingan, `+ -`, `* / %`, negasi, primer.
+//! Parser Lontar (M2): ekspresi (literal, nama, operator, kurung, blok,
+//! panggilan fungsi), pernyataan `let`, dan `fn`.
+//! Presedensi dari terendah: `||`, `&&`, perbandingan, `+ -`, `* / %`,
+//! unary (`-`, `!`), panggilan, primer. `(` hanya memulai panggilan jika satu
+//! baris dengan token sebelumnya.
 //! Titik koma opsional: pernyataan berakhir di `;`, di `}`, atau saat token
 //! berikutnya ada di baris lebih baru. Ekspresi terakhir blok tanpa `;` = nilai.
 
@@ -20,6 +22,8 @@ pub enum Op {
     KurangSama,
     LebihDari,
     LebihSama,
+    Dan,
+    Atau,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -29,6 +33,11 @@ pub enum Ekspr {
     Bool(bool),
     Nama(String),
     Negasi(Box<Ekspr>),
+    Tidak(Box<Ekspr>),
+    Panggil {
+        fungsi: Box<Ekspr>,
+        arg: Vec<Ekspr>,
+    },
     Biner {
         op: Op,
         kiri: Box<Ekspr>,
@@ -107,7 +116,7 @@ pub fn parse_ekspr(token: &[Token]) -> Result<Ekspr, Kesalahan> {
         ));
     }
     let mut p = Parser { token, pos: 0 };
-    let e = p.banding()?;
+    let e = p.ekspr()?;
     let sisa = p.lihat();
     if sisa.jenis != Jenis::Eof {
         return Err(Kesalahan::baru(
@@ -227,7 +236,7 @@ impl<'a> Parser<'a> {
             None
         };
         self.harap(Jenis::Assign, "'='")?;
-        let nilai = self.banding()?;
+        let nilai = self.ekspr()?;
         Ok(Pernyataan::Let {
             nama,
             ubah,
@@ -261,7 +270,7 @@ impl<'a> Parser<'a> {
                     pernyataan.push(p);
                 }
                 _ => {
-                    let e = self.banding()?;
+                    let e = self.ekspr()?;
                     match self.akhir()? {
                         Akhir::Tutup => nilai = Some(Box::new(e)),
                         _ => pernyataan.push(Pernyataan::Ekspresi(e)),
@@ -270,6 +279,30 @@ impl<'a> Parser<'a> {
             }
         }
         Ok(Blok { pernyataan, nilai })
+    }
+
+    fn ekspr(&mut self) -> Result<Ekspr, Kesalahan> {
+        self.atau()
+    }
+
+    fn atau(&mut self) -> Result<Ekspr, Kesalahan> {
+        let mut kiri = self.dan()?;
+        while self.lihat().jenis == Jenis::OrOr {
+            self.maju();
+            let kanan = self.dan()?;
+            kiri = biner(Op::Atau, kiri, kanan);
+        }
+        Ok(kiri)
+    }
+
+    fn dan(&mut self) -> Result<Ekspr, Kesalahan> {
+        let mut kiri = self.banding()?;
+        while self.lihat().jenis == Jenis::AndAnd {
+            self.maju();
+            let kanan = self.banding()?;
+            kiri = biner(Op::Dan, kiri, kanan);
+        }
+        Ok(kiri)
     }
 
     fn banding(&mut self) -> Result<Ekspr, Kesalahan> {
@@ -308,7 +341,34 @@ impl<'a> Parser<'a> {
             let e = self.unary()?;
             return Ok(Ekspr::Negasi(Box::new(e)));
         }
-        self.primer()
+        if self.lihat().jenis == Jenis::Bang {
+            self.maju();
+            let e = self.unary()?;
+            return Ok(Ekspr::Tidak(Box::new(e)));
+        }
+        self.panggilan()
+    }
+
+    fn panggilan(&mut self) -> Result<Ekspr, Kesalahan> {
+        let mut e = self.primer()?;
+        while self.lihat().jenis == Jenis::LParen && self.lihat().baris == self.sebelumnya().baris {
+            self.maju();
+            let mut arg = Vec::new();
+            while self.lihat().jenis != Jenis::RParen {
+                arg.push(self.ekspr()?);
+                if self.lihat().jenis == Jenis::Comma {
+                    self.maju();
+                } else {
+                    break;
+                }
+            }
+            self.harap(Jenis::RParen, "')'")?;
+            e = Ekspr::Panggil {
+                fungsi: Box::new(e),
+                arg,
+            };
+        }
+        Ok(e)
     }
 
     fn primer(&mut self) -> Result<Ekspr, Kesalahan> {
@@ -325,7 +385,7 @@ impl<'a> Parser<'a> {
             }
             Jenis::LParen => {
                 self.maju();
-                let e = self.banding()?;
+                let e = self.ekspr()?;
                 let tutup = self.lihat();
                 if tutup.jenis != Jenis::RParen {
                     return Err(Kesalahan::baru(
@@ -397,6 +457,9 @@ fn harapan(apa: &str, t: &Token) -> Kesalahan {
 
 fn deskripsi(j: &Jenis) -> String {
     match j {
+        Jenis::AndAnd => "'&&'".to_string(),
+        Jenis::OrOr => "'||'".to_string(),
+        Jenis::Bang => "'!'".to_string(),
         Jenis::Semi => "';'".to_string(),
         Jenis::LBrace => "'{'".to_string(),
         Jenis::RBrace => "'}'".to_string(),
@@ -655,5 +718,87 @@ mod tests {
     fn param_tanpa_tipe_ditolak() {
         let e = prog("fn f(a) {}").unwrap_err();
         assert!(e.pesan.contains("diharapkan ':'"), "{}", e);
+    }
+
+    fn tidak(e: Ekspr) -> Ekspr {
+        Ekspr::Tidak(Box::new(e))
+    }
+
+    fn panggil(f: Ekspr, arg: Vec<Ekspr>) -> Ekspr {
+        Ekspr::Panggil {
+            fungsi: Box::new(f),
+            arg,
+        }
+    }
+
+    #[test]
+    fn dan_lebih_kuat_dari_atau() {
+        assert_eq!(
+            parse("a || b && c").unwrap(),
+            biner(Op::Atau, nama("a"), biner(Op::Dan, nama("b"), nama("c")))
+        );
+    }
+
+    #[test]
+    fn perbandingan_lebih_kuat_dari_dan() {
+        assert_eq!(
+            parse("a < 1 && b").unwrap(),
+            biner(Op::Dan, biner(Op::KurangDari, nama("a"), int(1)), nama("b"))
+        );
+    }
+
+    #[test]
+    fn tidak_unary_dan_bersarang() {
+        assert_eq!(
+            parse("!a && b").unwrap(),
+            biner(Op::Dan, tidak(nama("a")), nama("b"))
+        );
+        assert_eq!(parse("!!x").unwrap(), tidak(tidak(nama("x"))));
+    }
+
+    #[test]
+    fn panggilan_tanpa_dan_dengan_argumen() {
+        assert_eq!(parse("f()").unwrap(), panggil(nama("f"), vec![]));
+        assert_eq!(
+            parse("f(1, a + 2,)").unwrap(),
+            panggil(
+                nama("f"),
+                vec![int(1), biner(Op::Tambah, nama("a"), int(2))]
+            )
+        );
+    }
+
+    #[test]
+    fn panggilan_bersarang_dan_berantai() {
+        assert_eq!(
+            parse("f(g(1))").unwrap(),
+            panggil(nama("f"), vec![panggil(nama("g"), vec![int(1)])])
+        );
+        assert_eq!(
+            parse("f(1)(2)").unwrap(),
+            panggil(panggil(nama("f"), vec![int(1)]), vec![int(2)])
+        );
+    }
+
+    #[test]
+    fn panggilan_lebih_kuat_dari_negasi() {
+        assert_eq!(
+            parse("-f(1)").unwrap(),
+            Ekspr::Negasi(Box::new(panggil(nama("f"), vec![int(1)])))
+        );
+    }
+
+    #[test]
+    fn kurung_di_baris_baru_bukan_panggilan() {
+        let b = badan("a\n(b)").unwrap();
+        assert_eq!(b.pernyataan, vec![Pernyataan::Ekspresi(nama("a"))]);
+        assert_eq!(b.nilai, Some(Box::new(nama("b"))));
+    }
+
+    #[test]
+    fn argumen_tidak_tertutup_ditolak() {
+        let e = parse("f(1").unwrap_err();
+        assert!(e.pesan.contains("diharapkan ')'"), "{}", e);
+        assert_eq!((e.baris, e.kolom), (1, 4));
     }
 }

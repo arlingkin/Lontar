@@ -1,8 +1,7 @@
 # ROADMAP
 ## Status singkat
-M0 (fondasi), M1 (lexer), dan M2 (parser ekspresi, `let`, blok, `fn`) selesai dan terverifikasi lokal: `cargo fmt --check`, `cargo build` (0 warning), `cargo test` (38 tes) lulus.
-CI GitHub Actions (`.github/workflows/ci.yml`) sudah ditulis; hasil hijau di Actions belum dikonfirmasi.
-Berikutnya parser `if`/`while`/`return` dan panggilan fungsi (M2 lanjutan), atau M3 pemeriksa tipe.
+M0 (fondasi), M1 (lexer), dan M2 sampai langkah 3 (ekspresi lengkap termasuk `&&`/`||`/`!` dan panggilan, `let`, blok, `fn`) selesai: `cargo fmt --check`, `cargo build` (0 warning), `cargo test` (46 tes) lulus lokal; CI Actions hijau pada 7f0f554.
+Berikutnya parser `if`/`else`, `while`, `return`, dan penugasan.
 ## Keputusan desain
 - Implementasi kompiler ditulis dalam Rust; bahasa Lontar mengambil sintaks yang familier dari Rust tanpa borrow checker dan lifetime.
 - Pipeline: sumber -> lexer -> parser/AST -> pemeriksa tipe -> IR -> backend.
@@ -18,14 +17,15 @@ Berikutnya parser `if`/`while`/`return` dan panggilan fungsi (M2 lanjutan), atau
 - [x] 2026-11-25: M1 lexer: `src/lexer.rs` (`tokenisasi`, `Token`, `Jenis`) dan `src/kesalahan.rs`. Mendukung kata kunci, identifier, Int/Float, operator, pemisah, komentar `//`, posisi baris:kolom, kesalahan berbahasa Indonesia. 13 tes unit lulus.
 - [x] 2026-11-25: M2 langkah 1 parser: `src/parser.rs` (`parse_ekspr`, `Ekspr`, `Op`) mendukung literal, nama, negasi, `+ - * / %`, perbandingan, dan kurung; kesalahan berbahasa Indonesia berposisi. 10 tes unit; total 24 tes lulus, fmt bersih, build 0 warning.
 - [x] 2026-11-26: M2 parser `let` (`let [mut] x [: T] = e`), blok (`{ ...; nilai }`), `fn nama(p: T) [-> T] { ... }`, `parse_program`. Titik koma opsional: pernyataan berakhir di `;`, `}`, atau baris baru (dihitung dari `baris` token, `Token` tidak diubah). 14 tes baru; total 38 lulus, fmt bersih, build 0 warning (lokal).
-- [ ] 2026-11-26: CI `.github/workflows/ci.yml` ditulis (fmt, build, test; Rust 1.75.0 dan stable); centang setelah hijau di Actions.
+- [x] 2026-11-26: CI `.github/workflows/ci.yml` (fmt, build, test; Rust 1.75.0 dan stable) hijau di Actions pada commit 7f0f554.
+- [x] 2026-11-26: M2 langkah 3 parser: `&&`, `||`, `!`, dan panggilan fungsi `f(a, b,)` (juga berantai/bersarang; `(` di baris baru bukan panggilan). 8 tes baru; total 46 lulus, fmt bersih, build 0 warning (lokal).
 ## Berikutnya
-1. Konfirmasi CI hijau di tab Actions (stable dan 1.75.0); perbaiki jika merah.
-2. M2 lanjutan: `if`/`else`, `while`, `return`, panggilan fungsi, `&&`/`||`/`!`.
+1. M2 lanjutan: `if`/`else` (sebagai ekspresi), `while`, `return`, dan penugasan `x = e`.
+2. M2 penutup: `for x in a..b`/`..=`, `struct`/`enum`/`impl` tingkat atas (boleh dipecah).
 3. M3: Pemeriksa tipe dasar.
 4. M4: IR sederhana.
 ## Ide / Utang teknis
-- Parser belum mengenal panggilan fungsi, `&&`/`||`/`!`, `if`/`while`/`return`, akses `.`, `let` tanpa nilai awal, tipe non-sederhana (`&T`, generik), serta `struct`/`enum`/`impl` tingkat atas. Operator biner melanjutkan ekspresi lintas baris (`a\n+ b` = `a + b`).
+- Parser belum mengenal `if`/`while`/`return`, penugasan `x = e`, akses `.`, `let` tanpa nilai awal, tipe non-sederhana (`&T`, generik), serta `struct`/`enum`/`impl` tingkat atas. Operator biner melanjutkan ekspresi lintas baris (`a\n+ b` = `a + b`).
 - Lexer belum mengenal string, char, `/* */`, pemisah angka `1_000`, dan escape; tambahkan saat dibutuhkan parser.
 - Evaluasi backend pertama setelah IR; JavaScript tetap kandidat awal.
 - Tentukan cakupan tipe awal dan strategi pengelolaan memori sebelum implementasi runtime.
