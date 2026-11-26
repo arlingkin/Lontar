@@ -4,7 +4,7 @@ Lontar adalah bahasa pemrograman buatan sendiri: sintaks mirip Rust, tetapi lebi
 
 ## Status
 
-Lontar masih tahap awal. Yang sudah jalan: **lexer** dan **parser** (sampai ekspresi, `let`, blok, `fn`, panggilan fungsi). Belum ada pemeriksa tipe, IR, backend, maupun cara menjalankan program Lontar. `cargo run` baru mencetak versi.
+Lontar masih tahap awal. Yang sudah jalan: **lexer** dan **parser** (sampai ekspresi, `let`, blok, `fn`, panggilan fungsi, `if`/`else`, `while`, `return`, penugasan). Belum ada pemeriksa tipe, IR, backend, maupun cara menjalankan program Lontar. `cargo run` baru mencetak versi.
 
 Detail kemajuan ada di [ROADMAP.md](ROADMAP.md), rancangan bahasa di [SPEC.md](SPEC.md).
 

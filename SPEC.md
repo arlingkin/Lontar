@@ -25,20 +25,23 @@ fn         := 'fn' nama '(' [param (',' param)* [',']] ')' ['->' tipe] blok
 param      := nama ':' tipe
 blok       := '{' (pernyataan | ';')* [ekspr] '}'     // ekspr terakhir tanpa ';' = nilai blok
 pernyataan := 'let' ['mut'] nama [':' tipe] '=' ekspr | ekspr
-ekspr      := atau;  atau := dan ('||' dan)*;  dan := banding ('&&' banding)*
+ekspr      := 'return' [ekspr] | nama '=' ekspr | atau       // penugasan: asosiatif kanan, terendah
+atau       := dan ('||' dan)*;  dan := banding ('&&' banding)*
 banding    := tambah (('==' | '!=' | '<' | '<=' | '>' | '>=') tambah)*
 tambah     := kali (('+' | '-') kali)*;  kali := unary (('*' | '/' | '%') unary)*
 unary      := ('-' | '!') unary | panggilan
 panggilan  := primer ('(' [ekspr (',' ekspr)* [',']] ')')*
-primer     := Int | Float | 'true' | 'false' | nama | '(' ekspr ')' | blok
+primer     := Int | Float | 'true' | 'false' | nama | '(' ekspr ')' | blok | jika | selama
+jika       := 'if' ekspr blok ['else' (jika | blok)]          // ekspresi; syarat tanpa kurung
+selama     := 'while' ekspr blok
 ```
 Tipe saat ini hanya nama sederhana (mis. `i32`). Operator biner asosiatif kiri.
 
 ## Aturan titik koma opsional
-Pernyataan berakhir di `;`, di `}`, atau saat token berikutnya berada di baris lebih baru. Dua pernyataan dalam satu baris wajib dipisah `;`. `(` hanya memulai panggilan jika satu baris dengan token sebelumnya. Operator biner tetap melanjutkan ekspresi lintas baris.
+Pernyataan berakhir di `;`, di `}`, atau saat token berikutnya berada di baris lebih baru. Dua pernyataan dalam satu baris wajib dipisah `;`. `(` hanya memulai panggilan jika satu baris dengan token sebelumnya. Operator biner tetap melanjutkan ekspresi lintas baris. `return` tanpa nilai jika diikuti `;`, `}`, `)`, `,`, akhir berkas, atau baris baru; `else` boleh di baris baru setelah `}`.
 
 ## Belum didukung
-`if`/`else`, `while`, `for`, `return`, penugasan `x = e`, `let` tanpa nilai awal, `struct`/`enum`/`impl`/`match`, akses `.`, string dan char, tipe majemuk (`&T`, generik).
+`for`, penugasan ke sasaran selain nama (mis. `a.b = e`), `let` tanpa nilai awal, `struct`/`enum`/`impl`/`match`, akses `.`, string dan char, tipe majemuk (`&T`, generik).
 
 ## Arsitektur kompiler
 Sumber -> lexer -> parser dan AST -> pemeriksa tipe -> IR sederhana -> backend.

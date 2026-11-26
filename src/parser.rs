@@ -1,5 +1,6 @@
 //! Parser Lontar (M2): ekspresi (literal, nama, operator, kurung, blok,
-//! panggilan fungsi), pernyataan `let`, dan `fn`.
+//! panggilan fungsi, `if`/`else`, `while`, `return`, penugasan `x = e`),
+//! pernyataan `let`, dan `fn`. Penugasan berasosiasi kanan dan terendah.
 //! Presedensi dari terendah: `||`, `&&`, perbandingan, `+ -`, `* / %`,
 //! unary (`-`, `!`), panggilan, primer. `(` hanya memulai panggilan jika satu
 //! baris dengan token sebelumnya.
@@ -44,6 +45,22 @@ pub enum Ekspr {
         kanan: Box<Ekspr>,
     },
     Blok(Blok),
+    /// `if syarat { .. } [else { .. } | else if ..]`; `lainnya` = `Blok` atau `Jika`.
+    Jika {
+        syarat: Box<Ekspr>,
+        maka: Blok,
+        lainnya: Option<Box<Ekspr>>,
+    },
+    Selama {
+        syarat: Box<Ekspr>,
+        badan: Blok,
+    },
+    Balik(Option<Box<Ekspr>>),
+    /// `sasaran = nilai`; saat ini sasaran selalu `Ekspr::Nama`.
+    Tugas {
+        sasaran: Box<Ekspr>,
+        nilai: Box<Ekspr>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -282,7 +299,74 @@ impl<'a> Parser<'a> {
     }
 
     fn ekspr(&mut self) -> Result<Ekspr, Kesalahan> {
-        self.atau()
+        if self.lihat().jenis == Jenis::Return {
+            return self.balik();
+        }
+        let awal = self.lihat();
+        let kiri = self.atau()?;
+        if self.lihat().jenis != Jenis::Assign {
+            return Ok(kiri);
+        }
+        if !matches!(kiri, Ekspr::Nama(_)) {
+            return Err(Kesalahan::baru(
+                "sasaran penugasan harus berupa nama",
+                awal.baris,
+                awal.kolom,
+            ));
+        }
+        self.maju();
+        let nilai = self.ekspr()?;
+        Ok(Ekspr::Tugas {
+            sasaran: Box::new(kiri),
+            nilai: Box::new(nilai),
+        })
+    }
+
+    /// `return [e]`: nilai dilewati jika token berikutnya `;`, `}`, `)`, `,`,
+    /// akhir berkas, atau ada di baris lain.
+    fn balik(&mut self) -> Result<Ekspr, Kesalahan> {
+        let kata = self.lihat();
+        self.maju();
+        let t = self.lihat();
+        let ada = t.baris == kata.baris
+            && !matches!(
+                t.jenis,
+                Jenis::Semi | Jenis::RBrace | Jenis::RParen | Jenis::Comma | Jenis::Eof
+            );
+        let nilai = if ada {
+            Some(Box::new(self.ekspr()?))
+        } else {
+            None
+        };
+        Ok(Ekspr::Balik(nilai))
+    }
+
+    fn jika(&mut self) -> Result<Ekspr, Kesalahan> {
+        self.maju(); // `if`
+        let syarat = Box::new(self.ekspr()?);
+        let maka = self.blok()?;
+        let lainnya = if self.lihat().jenis == Jenis::Else {
+            self.maju();
+            if self.lihat().jenis == Jenis::If {
+                Some(Box::new(self.jika()?))
+            } else {
+                Some(Box::new(Ekspr::Blok(self.blok()?)))
+            }
+        } else {
+            None
+        };
+        Ok(Ekspr::Jika {
+            syarat,
+            maka,
+            lainnya,
+        })
+    }
+
+    fn selama(&mut self) -> Result<Ekspr, Kesalahan> {
+        self.maju(); // `while`
+        let syarat = Box::new(self.ekspr()?);
+        let badan = self.blok()?;
+        Ok(Ekspr::Selama { syarat, badan })
     }
 
     fn atau(&mut self) -> Result<Ekspr, Kesalahan> {
@@ -383,6 +467,8 @@ impl<'a> Parser<'a> {
                 let b = self.blok()?;
                 return Ok(Ekspr::Blok(b));
             }
+            Jenis::If => return self.jika(),
+            Jenis::While => return self.selama(),
             Jenis::LParen => {
                 self.maju();
                 let e = self.ekspr()?;
@@ -471,6 +557,10 @@ fn deskripsi(j: &Jenis) -> String {
         Jenis::Arrow => "'->'".to_string(),
         Jenis::Fn => "'fn'".to_string(),
         Jenis::Let => "'let'".to_string(),
+        Jenis::If => "'if'".to_string(),
+        Jenis::Else => "'else'".to_string(),
+        Jenis::While => "'while'".to_string(),
+        Jenis::Return => "'return'".to_string(),
         Jenis::Int(n) => format!("angka '{}'", n),
         Jenis::Float(f) => format!("angka '{}'", f),
         Jenis::Ident(s) => format!("nama '{}'", s),
@@ -800,5 +890,192 @@ mod tests {
         let e = parse("f(1").unwrap_err();
         assert!(e.pesan.contains("diharapkan ')'"), "{}", e);
         assert_eq!((e.baris, e.kolom), (1, 4));
+    }
+
+    fn blok_nilai(e: Ekspr) -> Blok {
+        Blok {
+            pernyataan: vec![],
+            nilai: Some(Box::new(e)),
+        }
+    }
+
+    fn kosong() -> Blok {
+        Blok {
+            pernyataan: vec![],
+            nilai: None,
+        }
+    }
+
+    #[test]
+    fn jika_tanpa_else() {
+        assert_eq!(
+            parse("if a { 1 }").unwrap(),
+            Ekspr::Jika {
+                syarat: Box::new(nama("a")),
+                maka: blok_nilai(int(1)),
+                lainnya: None,
+            }
+        );
+    }
+
+    #[test]
+    fn jika_dengan_else_dan_syarat_majemuk() {
+        assert_eq!(
+            parse("if a < 1 && b { 1 } else { 2 }").unwrap(),
+            Ekspr::Jika {
+                syarat: Box::new(biner(
+                    Op::Dan,
+                    biner(Op::KurangDari, nama("a"), int(1)),
+                    nama("b")
+                )),
+                maka: blok_nilai(int(1)),
+                lainnya: Some(Box::new(Ekspr::Blok(blok_nilai(int(2))))),
+            }
+        );
+    }
+
+    #[test]
+    fn else_if_berantai() {
+        let e = parse("if a { 1 } else if b { 2 } else { 3 }").unwrap();
+        let Ekspr::Jika { lainnya, .. } = e else {
+            panic!("diharapkan Jika");
+        };
+        assert_eq!(
+            *lainnya.unwrap(),
+            Ekspr::Jika {
+                syarat: Box::new(nama("b")),
+                maka: blok_nilai(int(2)),
+                lainnya: Some(Box::new(Ekspr::Blok(blok_nilai(int(3))))),
+            }
+        );
+    }
+
+    #[test]
+    fn else_di_baris_baru_tetap_menyambung() {
+        let e = parse("if a { 1 }\nelse { 2 }").unwrap();
+        assert!(matches!(
+            e,
+            Ekspr::Jika {
+                lainnya: Some(_),
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn jika_sebagai_nilai_let_dan_blok() {
+        let b = badan("let x = if a { 1 } else { 2 }\nx").unwrap();
+        assert!(matches!(
+            &b.pernyataan[0],
+            Pernyataan::Let {
+                nilai: Ekspr::Jika { .. },
+                ..
+            }
+        ));
+        let b = badan("if a { 1 } else { 2 }").unwrap();
+        assert!(matches!(b.nilai.as_deref(), Some(Ekspr::Jika { .. })));
+    }
+
+    #[test]
+    fn jika_pernyataan_tanpa_titik_koma_lalu_baris_baru() {
+        let b = badan("if a { f() }\nlet y = 1\ny").unwrap();
+        assert_eq!(b.pernyataan.len(), 2);
+        assert_eq!(b.nilai.as_deref(), Some(&nama("y")));
+    }
+
+    #[test]
+    fn selama_dengan_badan() {
+        assert_eq!(
+            parse("while i < 3 { i = i + 1 }").unwrap(),
+            Ekspr::Selama {
+                syarat: Box::new(biner(Op::KurangDari, nama("i"), int(3))),
+                badan: blok_nilai(Ekspr::Tugas {
+                    sasaran: Box::new(nama("i")),
+                    nilai: Box::new(biner(Op::Tambah, nama("i"), int(1))),
+                }),
+            }
+        );
+    }
+
+    #[test]
+    fn balik_dengan_dan_tanpa_nilai() {
+        assert_eq!(
+            parse("return a + 1").unwrap(),
+            Ekspr::Balik(Some(Box::new(biner(Op::Tambah, nama("a"), int(1)))))
+        );
+        assert_eq!(parse("return").unwrap(), Ekspr::Balik(None));
+        let b = badan("return;\nreturn\n1").unwrap();
+        assert_eq!(b.pernyataan.len(), 2);
+        assert_eq!(b.pernyataan[0], Pernyataan::Ekspresi(Ekspr::Balik(None)));
+        assert_eq!(b.pernyataan[1], Pernyataan::Ekspresi(Ekspr::Balik(None)));
+        assert_eq!(b.nilai.as_deref(), Some(&int(1)));
+    }
+
+    #[test]
+    fn balik_di_dalam_jika_menjadi_nilai_blok() {
+        let b = badan("if a { return 1 }").unwrap();
+        let Some(Ekspr::Jika { maka, .. }) = b.nilai.as_deref() else {
+            panic!("diharapkan Jika");
+        };
+        assert_eq!(
+            maka.nilai.as_deref(),
+            Some(&Ekspr::Balik(Some(Box::new(int(1)))))
+        );
+    }
+
+    #[test]
+    fn penugasan_asosiatif_kanan_dan_terendah() {
+        assert_eq!(
+            parse("a = b = 1 || c").unwrap(),
+            Ekspr::Tugas {
+                sasaran: Box::new(nama("a")),
+                nilai: Box::new(Ekspr::Tugas {
+                    sasaran: Box::new(nama("b")),
+                    nilai: Box::new(biner(Op::Atau, int(1), nama("c"))),
+                }),
+            }
+        );
+    }
+
+    #[test]
+    fn penugasan_sebagai_pernyataan() {
+        let b = badan("let mut x = 0\nx = x + 1\nx").unwrap();
+        assert!(matches!(
+            &b.pernyataan[1],
+            Pernyataan::Ekspresi(Ekspr::Tugas { .. })
+        ));
+    }
+
+    #[test]
+    fn sasaran_penugasan_bukan_nama_ditolak() {
+        let e = parse("1 + 2 = 3").unwrap_err();
+        assert_eq!(e.pesan, "sasaran penugasan harus berupa nama");
+        assert_eq!((e.baris, e.kolom), (1, 1));
+    }
+
+    #[test]
+    fn jika_tanpa_kurung_kurawal_ditolak() {
+        let e = parse("if a 1").unwrap_err();
+        assert_eq!(e.pesan, "diharapkan '{', ditemukan angka '1'");
+    }
+
+    #[test]
+    fn else_tanpa_if_ditolak() {
+        let e = parse("else { 1 }").unwrap_err();
+        assert_eq!(e.pesan, "diharapkan ekspresi, ditemukan 'else'");
+    }
+
+    #[test]
+    fn selama_tanpa_badan_ditolak() {
+        let e = parse("while a").unwrap_err();
+        assert_eq!(e.pesan, "diharapkan '{', ditemukan akhir berkas");
+    }
+
+    #[test]
+    fn blok_kosong_di_jika() {
+        assert!(matches!(
+            parse("if a {}").unwrap(),
+            Ekspr::Jika { maka, .. } if maka == kosong()
+        ));
     }
 }

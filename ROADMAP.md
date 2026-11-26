@@ -1,7 +1,7 @@
 # ROADMAP
 ## Status singkat
-M0 (fondasi), M1 (lexer), dan M2 sampai langkah 3 (ekspresi lengkap termasuk `&&`/`||`/`!` dan panggilan, `let`, blok, `fn`) selesai: `cargo fmt --check`, `cargo build` (0 warning), `cargo test` (46 tes) lulus; CI Actions hijau pada 92eb3d7.
-Berikutnya parser `if`/`else`, `while`, `return`, dan penugasan.
+M0 (fondasi), M1 (lexer), dan M2 sampai langkah 3 (ekspresi lengkap, `let`, blok, `fn`) selesai dan CI hijau pada 92eb3d7. M2 langkah 4 (`if`/`else`, `while`, `return`, penugasan) sudah ditulis: lokal fmt bersih, 0 warning (-D warnings), 62 tes lulus; menunggu CI.
+Berikutnya parser `for` dan `struct`/`enum`/`impl`.
 ## Keputusan desain
 - Implementasi kompiler ditulis dalam Rust; bahasa Lontar mengambil sintaks yang familier dari Rust tanpa borrow checker dan lifetime.
 - Pipeline: sumber -> lexer -> parser/AST -> pemeriksa tipe -> IR -> backend.
@@ -20,13 +20,14 @@ Berikutnya parser `if`/`else`, `while`, `return`, dan penugasan.
 - [x] 2026-11-26: CI `.github/workflows/ci.yml` (fmt, build, test; Rust 1.75.0 dan stable) hijau di Actions pada commit 7f0f554.
 - [x] 2026-11-26: Dokumen diselaraskan dengan alur CI: `README.md` (status, contoh, cara pakai, daftar kode), `SPEC.md` (tata bahasa dan aturan titik koma), `CLAUDE.md` (verifikasi lewat CI, format penutup). Contoh README dijalankan lokal; CI commit 92eb3d7 hijau.
 - [x] 2026-11-26: M2 langkah 3 parser: `&&`, `||`, `!`, dan panggilan fungsi `f(a, b,)` (juga berantai/bersarang; `(` di baris baru bukan panggilan). 8 tes baru; total 46 lulus, fmt bersih, build 0 warning; CI hijau pada 92eb3d7.
+- [ ] 2026-11-26: M2 langkah 4 parser: `if`/`else`/`else if` (ekspresi, syarat tanpa kurung), `while`, `return [e]`, penugasan `x = e` (asosiatif kanan, terendah; sasaran harus nama). 16 tes baru; total 62 lulus, fmt bersih, 0 warning lokal. Menunggu CI hijau.
 ## Berikutnya
-1. M2 lanjutan: `if`/`else` (sebagai ekspresi), `while`, `return`, dan penugasan `x = e`.
+1. Centang M2 langkah 4 setelah CI hijau pada commit-nya (jika merah, perbaiki dulu).
 2. M2 penutup: `for x in a..b`/`..=`, `struct`/`enum`/`impl` tingkat atas (boleh dipecah).
 3. M3: Pemeriksa tipe dasar.
 4. M4: IR sederhana.
 ## Ide / Utang teknis
-- Parser belum mengenal `if`/`while`/`return`, penugasan `x = e`, akses `.`, `let` tanpa nilai awal, tipe non-sederhana (`&T`, generik), serta `struct`/`enum`/`impl` tingkat atas. Operator biner melanjutkan ekspresi lintas baris (`a\n+ b` = `a + b`).
+- Parser belum mengenal `for`, akses `.`, penugasan ke sasaran selain nama, `let` tanpa nilai awal, tipe non-sederhana (`&T`, generik), serta `struct`/`enum`/`impl` tingkat atas. Operator biner melanjutkan ekspresi lintas baris (`a\n+ b` = `a + b`).
 - Lexer belum mengenal string, char, `/* */`, pemisah angka `1_000`, dan escape; tambahkan saat dibutuhkan parser.
 - Evaluasi backend pertama setelah IR; JavaScript tetap kandidat awal.
 - Tentukan cakupan tipe awal dan strategi pengelolaan memori sebelum implementasi runtime.
