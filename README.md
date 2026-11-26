@@ -1,4 +1,8 @@
-# Lontar
+<p align="center">
+  <img src="icon.png" alt="Ikon Lontar: daun lontar tersenyum diapit kurung kurawal" width="160">
+</p>
+
+<h1 align="center">Lontar</h1>
 
 Lontar adalah bahasa pemrograman buatan sendiri: sintaks mirip Rust, tetapi lebih ringan (tanpa borrow checker dan lifetime), dengan pesan kesalahan berbahasa Indonesia lengkap dengan nomor baris dan kolom. Kompilernya ditulis dalam Rust tanpa dependensi eksternal.
 
@@ -73,6 +77,7 @@ kesalahan di baris 1, kolom 7: diharapkan nama parameter, ditemukan '{'
 | `src/lexer.rs` | `tokenisasi`, `Token`, `Jenis` | Mengubah teks sumber menjadi token berposisi: angka (Int/Float), nama, kata kunci, operator, pemisah, komentar `//` dilewati. Token terakhir selalu `Eof`. |
 | `src/parser.rs` | `parse_ekspr`, `parse_program`, `Ekspr`, `Pernyataan`, `Blok`, `Fungsi`, `Struktur`, `Enumerasi`, `Impl`, `Program`, `Op` | Mengubah token menjadi AST. `parse_ekspr` mengurai satu ekspresi; `parse_program` mengurai deretan `fn`, `struct`, `enum`, dan `impl` tingkat atas. |
 | `tests/dasar.rs` | tes integrasi | Memastikan biner mencetak nama dan versi. |
+| `icon.png` | | Ikon proyek (512x512): daun lontar tersenyum dengan lubang tali sebagai mata, diapit `{ }`. Tampil di bagian atas README. |
 | `Cargo.toml`, `Cargo.lock` | | Konfigurasi proyek (edition 2021, tanpa dependensi). |
 | `.github/workflows/ci.yml` | | CI GitHub Actions: `cargo fmt --check`, `cargo build`, `cargo test` pada Rust 1.75.0 dan stable, dijalankan setiap push ke `main` dan pada PR. |
 

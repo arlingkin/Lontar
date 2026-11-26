@@ -24,6 +24,7 @@ Berikutnya M3 pemeriksa tipe dasar.
 - [x] 2026-11-26: M2 langkah 4 parser: `if`/`else`/`else if` (ekspresi, syarat tanpa kurung), `while`, `return [e]`, penugasan `x = e` (asosiatif kanan, terendah; sasaran harus nama). 16 tes baru; total 62 lulus, fmt bersih, 0 warning; CI hijau pada e278bf1.
 - [x] 2026-11-26: M2 langkah 5 parser: `for nama in ekspr { .. }` dan rentang `a..b`/`a..=b` (di atas penugasan, di bawah `||`; tanpa rantai; kedua ujung wajib). 8 tes baru; total 70 lulus, fmt bersih, 0 warning; CI hijau pada a6891a0.
 - [x] 2026-11-26: M2 langkah 6 parser: `struct Nama { a: T, }`, `enum Nama { A, B, }` (varian tanpa data), `impl Nama { fn .. }` tingkat atas; `Program` kini punya `struktur`, `enumerasi`, `impls` (dikelompokkan per jenis). 8 tes baru; total 78 lulus, fmt bersih, 0 warning; CI hijau pada 017a5ef. M2 selesai.
+- [x] 2026-11-26: Ikon proyek `icon.png` (512x512) dan ditampilkan rata tengah di bagian atas `README.md`.
 ## Berikutnya
 1. M3: Pemeriksa tipe dasar (mulai dari tabel simbol dan tipe literal/operator; tentukan cakupan tipe awal lebih dulu).
 2. M4: IR sederhana.
