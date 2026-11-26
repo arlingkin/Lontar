@@ -1,6 +1,8 @@
-//! Parser Lontar (M2, langkah 1): literal, nama, negasi, operator aritmetika
-//! dan perbandingan, serta kurung. Presedensi dari terendah: perbandingan,
-//! `+ -`, `* / %`, negasi unary, lalu primer. Asosiatif kiri.
+//! Parser Lontar (M2): ekspresi (literal, nama, negasi, operator aritmetika
+//! dan perbandingan, kurung, blok), pernyataan `let`, dan `fn`.
+//! Presedensi dari terendah: perbandingan, `+ -`, `* / %`, negasi, primer.
+//! Titik koma opsional: pernyataan berakhir di `;`, di `}`, atau saat token
+//! berikutnya ada di baris lebih baru. Ekspresi terakhir blok tanpa `;` = nilai.
 
 use crate::kesalahan::Kesalahan;
 use crate::lexer::{Jenis, Token};
@@ -32,6 +34,67 @@ pub enum Ekspr {
         kiri: Box<Ekspr>,
         kanan: Box<Ekspr>,
     },
+    Blok(Blok),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Blok {
+    pub pernyataan: Vec<Pernyataan>,
+    /// Ekspresi terakhir tanpa `;` (nilai balik blok), jika ada.
+    pub nilai: Option<Box<Ekspr>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Pernyataan {
+    Let {
+        nama: String,
+        ubah: bool,
+        tipe: Option<String>,
+        nilai: Ekspr,
+    },
+    Ekspresi(Ekspr),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Param {
+    pub nama: String,
+    pub tipe: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Fungsi {
+    pub nama: String,
+    pub param: Vec<Param>,
+    pub balik: Option<String>,
+    pub badan: Blok,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Program {
+    pub fungsi: Vec<Fungsi>,
+}
+
+/// Mengurai seluruh berkas: saat ini hanya deretan `fn` tingkat atas.
+pub fn parse_program(token: &[Token]) -> Result<Program, Kesalahan> {
+    if token.is_empty() {
+        return Err(Kesalahan::baru(
+            "diharapkan 'fn', ditemukan akhir berkas",
+            1,
+            1,
+        ));
+    }
+    let mut p = Parser { token, pos: 0 };
+    let mut fungsi = Vec::new();
+    while p.lihat().jenis != Jenis::Eof {
+        fungsi.push(p.fungsi()?);
+    }
+    Ok(Program { fungsi })
+}
+
+enum Akhir {
+    TitikKoma,
+    Tutup,
+    BarisBaru,
 }
 
 /// Mengurai satu ekspresi dari token hasil `tokenisasi`; seluruh token harus habis.
@@ -75,6 +138,138 @@ impl<'a> Parser<'a> {
         if self.pos + 1 < self.token.len() {
             self.pos += 1;
         }
+    }
+
+    fn sebelumnya(&self) -> &'a Token {
+        let toks: &'a [Token] = self.token;
+        &toks[self.pos.saturating_sub(1)]
+    }
+
+    fn harap(&mut self, j: Jenis, apa: &str) -> Result<(), Kesalahan> {
+        let t = self.lihat();
+        if t.jenis != j {
+            return Err(harapan(apa, t));
+        }
+        self.maju();
+        Ok(())
+    }
+
+    fn ident(&mut self, apa: &str) -> Result<String, Kesalahan> {
+        let t = self.lihat();
+        match &t.jenis {
+            Jenis::Ident(s) => {
+                let s = s.clone();
+                self.maju();
+                Ok(s)
+            }
+            _ => Err(harapan(apa, t)),
+        }
+    }
+
+    /// Penutup pernyataan: `;` (dikonsumsi), `}` (tidak dikonsumsi), atau baris baru.
+    fn akhir(&mut self) -> Result<Akhir, Kesalahan> {
+        let t = self.lihat();
+        match t.jenis {
+            Jenis::Semi => {
+                self.maju();
+                Ok(Akhir::TitikKoma)
+            }
+            Jenis::RBrace => Ok(Akhir::Tutup),
+            Jenis::Eof => Ok(Akhir::BarisBaru),
+            _ if t.baris > self.sebelumnya().baris => Ok(Akhir::BarisBaru),
+            _ => Err(harapan("';' atau baris baru", t)),
+        }
+    }
+
+    fn fungsi(&mut self) -> Result<Fungsi, Kesalahan> {
+        self.harap(Jenis::Fn, "'fn'")?;
+        let nama = self.ident("nama fungsi")?;
+        self.harap(Jenis::LParen, "'('")?;
+        let mut param = Vec::new();
+        while self.lihat().jenis != Jenis::RParen {
+            let n = self.ident("nama parameter")?;
+            self.harap(Jenis::Colon, "':'")?;
+            let tipe = self.ident("nama tipe")?;
+            param.push(Param { nama: n, tipe });
+            if self.lihat().jenis == Jenis::Comma {
+                self.maju();
+            } else {
+                break;
+            }
+        }
+        self.harap(Jenis::RParen, "')'")?;
+        let balik = if self.lihat().jenis == Jenis::Arrow {
+            self.maju();
+            Some(self.ident("nama tipe")?)
+        } else {
+            None
+        };
+        let badan = self.blok()?;
+        Ok(Fungsi {
+            nama,
+            param,
+            balik,
+            badan,
+        })
+    }
+
+    fn pernyataan_let(&mut self) -> Result<Pernyataan, Kesalahan> {
+        self.maju(); // `let`
+        let ubah = self.lihat().jenis == Jenis::Mut;
+        if ubah {
+            self.maju();
+        }
+        let nama = self.ident("nama variabel")?;
+        let tipe = if self.lihat().jenis == Jenis::Colon {
+            self.maju();
+            Some(self.ident("nama tipe")?)
+        } else {
+            None
+        };
+        self.harap(Jenis::Assign, "'='")?;
+        let nilai = self.banding()?;
+        Ok(Pernyataan::Let {
+            nama,
+            ubah,
+            tipe,
+            nilai,
+        })
+    }
+
+    fn blok(&mut self) -> Result<Blok, Kesalahan> {
+        self.harap(Jenis::LBrace, "'{'")?;
+        let mut pernyataan = Vec::new();
+        let mut nilai = None;
+        loop {
+            let t = self.lihat();
+            match t.jenis {
+                Jenis::RBrace => {
+                    self.maju();
+                    break;
+                }
+                Jenis::Eof => {
+                    return Err(Kesalahan::baru(
+                        "blok tidak ditutup: diharapkan '}', ditemukan akhir berkas",
+                        t.baris,
+                        t.kolom,
+                    ))
+                }
+                Jenis::Semi => self.maju(),
+                Jenis::Let => {
+                    let p = self.pernyataan_let()?;
+                    self.akhir()?;
+                    pernyataan.push(p);
+                }
+                _ => {
+                    let e = self.banding()?;
+                    match self.akhir()? {
+                        Akhir::Tutup => nilai = Some(Box::new(e)),
+                        _ => pernyataan.push(Pernyataan::Ekspresi(e)),
+                    }
+                }
+            }
+        }
+        Ok(Blok { pernyataan, nilai })
     }
 
     fn banding(&mut self) -> Result<Ekspr, Kesalahan> {
@@ -124,6 +319,10 @@ impl<'a> Parser<'a> {
             Jenis::True => Ekspr::Bool(true),
             Jenis::False => Ekspr::Bool(false),
             Jenis::Ident(s) => Ekspr::Nama(s.clone()),
+            Jenis::LBrace => {
+                let b = self.blok()?;
+                return Ok(Ekspr::Blok(b));
+            }
             Jenis::LParen => {
                 self.maju();
                 let e = self.banding()?;
@@ -188,8 +387,27 @@ fn op_kali(j: &Jenis) -> Option<Op> {
     }
 }
 
+fn harapan(apa: &str, t: &Token) -> Kesalahan {
+    Kesalahan::baru(
+        format!("diharapkan {}, ditemukan {}", apa, deskripsi(&t.jenis)),
+        t.baris,
+        t.kolom,
+    )
+}
+
 fn deskripsi(j: &Jenis) -> String {
     match j {
+        Jenis::Semi => "';'".to_string(),
+        Jenis::LBrace => "'{'".to_string(),
+        Jenis::RBrace => "'}'".to_string(),
+        Jenis::LParen => "'('".to_string(),
+        Jenis::RParen => "')'".to_string(),
+        Jenis::Colon => "':'".to_string(),
+        Jenis::Comma => "','".to_string(),
+        Jenis::Assign => "'='".to_string(),
+        Jenis::Arrow => "'->'".to_string(),
+        Jenis::Fn => "'fn'".to_string(),
+        Jenis::Let => "'let'".to_string(),
         Jenis::Int(n) => format!("angka '{}'", n),
         Jenis::Float(f) => format!("angka '{}'", f),
         Jenis::Ident(s) => format!("nama '{}'", s),
@@ -289,5 +507,153 @@ mod tests {
     fn ekspresi_kosong_ditolak() {
         let e = parse("").unwrap_err();
         assert!(e.pesan.contains("diharapkan ekspresi"), "{}", e);
+    }
+
+    fn prog(s: &str) -> Result<Program, Kesalahan> {
+        let t = tokenisasi(s)?;
+        parse_program(&t)
+    }
+
+    /// Mengurai `isi` sebagai badan `fn f() { isi }` lalu mengembalikan bloknya.
+    fn badan(isi: &str) -> Result<Blok, Kesalahan> {
+        let mut p = prog(&format!("fn f() {{ {} }}", isi))?;
+        Ok(p.fungsi.remove(0).badan)
+    }
+
+    fn s(x: &str) -> String {
+        x.to_string()
+    }
+
+    #[test]
+    fn let_sederhana() {
+        let b = badan("let x = 1 + 2").unwrap();
+        assert_eq!(
+            b.pernyataan,
+            vec![Pernyataan::Let {
+                nama: s("x"),
+                ubah: false,
+                tipe: None,
+                nilai: biner(Op::Tambah, int(1), int(2)),
+            }]
+        );
+        assert_eq!(b.nilai, None);
+    }
+
+    #[test]
+    fn let_mut_dengan_tipe() {
+        let b = badan("let mut n: i32 = 5;").unwrap();
+        assert_eq!(
+            b.pernyataan,
+            vec![Pernyataan::Let {
+                nama: s("n"),
+                ubah: true,
+                tipe: Some(s("i32")),
+                nilai: int(5),
+            }]
+        );
+    }
+
+    #[test]
+    fn titik_koma_opsional_antar_baris() {
+        let b = badan("let a = 1\nlet b = a\nb").unwrap();
+        assert_eq!(b.pernyataan.len(), 2);
+        assert_eq!(b.nilai, Some(Box::new(nama("b"))));
+    }
+
+    #[test]
+    fn ekspresi_terakhir_jadi_nilai_blok() {
+        let b = badan("1; 2").unwrap();
+        assert_eq!(b.pernyataan, vec![Pernyataan::Ekspresi(int(1))]);
+        assert_eq!(b.nilai, Some(Box::new(int(2))));
+    }
+
+    #[test]
+    fn titik_koma_di_akhir_membuang_nilai() {
+        let b = badan("a;").unwrap();
+        assert_eq!(b.pernyataan, vec![Pernyataan::Ekspresi(nama("a"))]);
+        assert_eq!(b.nilai, None);
+    }
+
+    #[test]
+    fn dua_pernyataan_satu_baris_tanpa_pemisah_ditolak() {
+        let e = badan("let a = 1 let b = 2").unwrap_err();
+        assert!(e.pesan.contains("';' atau baris baru"), "{}", e);
+        assert_eq!((e.baris, e.kolom), (1, 20));
+    }
+
+    #[test]
+    fn blok_sebagai_ekspresi() {
+        assert_eq!(
+            parse("{ 1 }").unwrap(),
+            Ekspr::Blok(Blok {
+                pernyataan: vec![],
+                nilai: Some(Box::new(int(1))),
+            })
+        );
+    }
+
+    #[test]
+    fn fn_lengkap() {
+        let p = prog("fn tambah(a: i32, b: i32) -> i32 { a + b }").unwrap();
+        assert_eq!(
+            p.fungsi,
+            vec![Fungsi {
+                nama: s("tambah"),
+                param: vec![
+                    Param {
+                        nama: s("a"),
+                        tipe: s("i32")
+                    },
+                    Param {
+                        nama: s("b"),
+                        tipe: s("i32")
+                    },
+                ],
+                balik: Some(s("i32")),
+                badan: Blok {
+                    pernyataan: vec![],
+                    nilai: Some(Box::new(biner(Op::Tambah, nama("a"), nama("b")))),
+                },
+            }]
+        );
+    }
+
+    #[test]
+    fn fn_tanpa_tipe_balik_dan_koma_akhir() {
+        let p = prog("fn f(a: i32,) {}").unwrap();
+        assert_eq!(p.fungsi[0].param.len(), 1);
+        assert_eq!(p.fungsi[0].balik, None);
+    }
+
+    #[test]
+    fn beberapa_fungsi_berurutan() {
+        let p = prog("fn a() {}\nfn b() {}").unwrap();
+        assert_eq!(p.fungsi.len(), 2);
+        assert_eq!(p.fungsi[1].nama, "b");
+    }
+
+    #[test]
+    fn blok_tidak_ditutup_ditolak() {
+        let e = prog("fn f() { 1").unwrap_err();
+        assert!(e.pesan.contains("blok tidak ditutup"), "{}", e);
+    }
+
+    #[test]
+    fn tingkat_atas_selain_fn_ditolak() {
+        let e = prog("let x = 1").unwrap_err();
+        assert!(e.pesan.contains("diharapkan 'fn'"), "{}", e);
+        assert_eq!((e.baris, e.kolom), (1, 1));
+    }
+
+    #[test]
+    fn let_tanpa_nilai_ditolak() {
+        let e = badan("let x").unwrap_err();
+        assert!(e.pesan.contains("diharapkan '='"), "{}", e);
+    }
+
+    #[test]
+    fn param_tanpa_tipe_ditolak() {
+        let e = prog("fn f(a) {}").unwrap_err();
+        assert!(e.pesan.contains("diharapkan ':'"), "{}", e);
     }
 }

@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  uji:
+    name: Rust ${{ matrix.rust }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 1.75.0 = versi yang dipakai pengembangan; ketat (fmt + 0 warning).
+        rust: ["1.75.0", "stable"]
+    env:
+      CARGO_TERM_COLOR: always
+      RUSTFLAGS: ${{ matrix.rust == '1.75.0' && '-D warnings' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pasang Rust ${{ matrix.rust }}
+        run: |
+          rustup toolchain install ${{ matrix.rust }} --profile minimal --component rustfmt --no-self-update
+          rustup default ${{ matrix.rust }}
+          rustc --version
+      - name: Cek format
+        if: matrix.rust == '1.75.0'
+        run: cargo fmt --all -- --check
+      - name: Build
+        run: cargo build --locked --all-targets
+      - name: Tes
+        run: cargo test --locked
