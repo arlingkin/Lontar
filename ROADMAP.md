@@ -1,6 +1,6 @@
 # ROADMAP
 ## Status singkat
-M0 (fondasi), M1 (lexer), dan M2 sampai langkah 3 (ekspresi lengkap, `let`, blok, `fn`) selesai dan M2 langkah 4 (`if`/`else`, `while`, `return`, penugasan) selesai dan CI hijau pada e278bf1. M2 langkah 5 (`for x in a..b`/`..=`) sudah ditulis: fmt bersih, 0 warning, 70 tes lulus lokal; menunggu CI.
+M0 (fondasi), M1 (lexer), dan M2 sampai langkah 3 (ekspresi lengkap, `let`, blok, `fn`) selesai dan M2 langkah 4 (`if`/`else`, `while`, `return`, penugasan) selesai dan CI hijau pada e278bf1. M2 langkah 5 (`for x in a..b`/`..=`) selesai: fmt bersih, 0 warning, 70 tes lulus; CI Actions hijau pada a6891a0.
 Berikutnya parser `struct`/`enum`/`impl`.
 ## Keputusan desain
 - Implementasi kompiler ditulis dalam Rust; bahasa Lontar mengambil sintaks yang familier dari Rust tanpa borrow checker dan lifetime.
@@ -21,12 +21,11 @@ Berikutnya parser `struct`/`enum`/`impl`.
 - [x] 2026-11-26: Dokumen diselaraskan dengan alur CI: `README.md` (status, contoh, cara pakai, daftar kode), `SPEC.md` (tata bahasa dan aturan titik koma), `CLAUDE.md` (verifikasi lewat CI, format penutup). Contoh README dijalankan lokal; CI commit 92eb3d7 hijau.
 - [x] 2026-11-26: M2 langkah 3 parser: `&&`, `||`, `!`, dan panggilan fungsi `f(a, b,)` (juga berantai/bersarang; `(` di baris baru bukan panggilan). 8 tes baru; total 46 lulus, fmt bersih, build 0 warning; CI hijau pada 92eb3d7.
 - [x] 2026-11-26: M2 langkah 4 parser: `if`/`else`/`else if` (ekspresi, syarat tanpa kurung), `while`, `return [e]`, penugasan `x = e` (asosiatif kanan, terendah; sasaran harus nama). 16 tes baru; total 62 lulus, fmt bersih, 0 warning; CI hijau pada e278bf1.
-- [ ] 2026-11-26: M2 langkah 5 parser: `for nama in ekspr { .. }` dan rentang `a..b`/`a..=b` (di atas penugasan, di bawah `||`; tanpa rantai; kedua ujung wajib). 8 tes baru; total 70 lulus, fmt bersih, 0 warning lokal. Menunggu CI hijau.
+- [x] 2026-11-26: M2 langkah 5 parser: `for nama in ekspr { .. }` dan rentang `a..b`/`a..=b` (di atas penugasan, di bawah `||`; tanpa rantai; kedua ujung wajib). 8 tes baru; total 70 lulus, fmt bersih, 0 warning; CI hijau pada a6891a0.
 ## Berikutnya
-1. Centang M2 langkah 5 setelah CI hijau pada commit-nya (jika merah, perbaiki dulu).
-2. M2 penutup: `struct`/`enum`/`impl` tingkat atas (boleh dipecah).
-3. M3: Pemeriksa tipe dasar.
-4. M4: IR sederhana.
+1. M2 penutup: `struct`/`enum`/`impl` tingkat atas (boleh dipecah).
+2. M3: Pemeriksa tipe dasar.
+3. M4: IR sederhana.
 ## Ide / Utang teknis
 - Parser belum mengenal akses `.`, penugasan ke sasaran selain nama, `let` tanpa nilai awal, tipe non-sederhana (`&T`, generik), serta `struct`/`enum`/`impl` tingkat atas. Operator biner melanjutkan ekspresi lintas baris (`a\n+ b` = `a + b`).
 - Lexer belum mengenal string, char, `/* */`, pemisah angka `1_000`, dan escape; tambahkan saat dibutuhkan parser.
