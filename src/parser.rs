@@ -1,6 +1,7 @@
 //! Parser Lontar (M2): ekspresi (literal, nama, operator, kurung, blok,
 //! panggilan fungsi, `if`/`else`, `while`, `for x in a..b`, `return`,
-//! penugasan `x = e`), pernyataan `let`, dan `fn`. Penugasan berasosiasi kanan
+//! penugasan `x = e`), pernyataan `let`, dan deklarasi tingkat atas `fn`,
+//! `struct`, `enum` (varian tanpa data), `impl`. Penugasan berasosiasi kanan
 //! dan terendah; rentang `a..b`/`a..=b` (tanpa rantai) tepat di atasnya.
 //! Presedensi dari terendah: `||`, `&&`, perbandingan, `+ -`, `* / %`,
 //! unary (`-`, `!`), panggilan, primer. `(` hanya memulai panggilan jika satu
@@ -109,11 +110,41 @@ pub struct Fungsi {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Program {
+pub struct Medan {
+    pub nama: String,
+    pub tipe: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Struktur {
+    pub nama: String,
+    pub medan: Vec<Medan>,
+}
+
+/// `enum` dengan varian tanpa data (varian berdata menyusul bersama `match`).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Enumerasi {
+    pub nama: String,
+    pub varian: Vec<String>,
+}
+
+/// `impl Nama { fn .. }`; `untuk` = nama tipe yang dituju.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Impl {
+    pub untuk: String,
     pub fungsi: Vec<Fungsi>,
 }
 
-/// Mengurai seluruh berkas: saat ini hanya deretan `fn` tingkat atas.
+/// Isi berkas, dikelompokkan per jenis deklarasi (urutan antarjenis tidak disimpan).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Program {
+    pub fungsi: Vec<Fungsi>,
+    pub struktur: Vec<Struktur>,
+    pub enumerasi: Vec<Enumerasi>,
+    pub impls: Vec<Impl>,
+}
+
+/// Mengurai seluruh berkas: deretan `fn`, `struct`, `enum`, dan `impl` tingkat atas.
 pub fn parse_program(token: &[Token]) -> Result<Program, Kesalahan> {
     if token.is_empty() {
         return Err(Kesalahan::baru(
@@ -123,11 +154,24 @@ pub fn parse_program(token: &[Token]) -> Result<Program, Kesalahan> {
         ));
     }
     let mut p = Parser { token, pos: 0 };
-    let mut fungsi = Vec::new();
-    while p.lihat().jenis != Jenis::Eof {
-        fungsi.push(p.fungsi()?);
+    let mut prog = Program {
+        fungsi: Vec::new(),
+        struktur: Vec::new(),
+        enumerasi: Vec::new(),
+        impls: Vec::new(),
+    };
+    loop {
+        let t = p.lihat();
+        match t.jenis {
+            Jenis::Eof => break,
+            Jenis::Fn => prog.fungsi.push(p.fungsi()?),
+            Jenis::Struct => prog.struktur.push(p.struktur()?),
+            Jenis::Enum => prog.enumerasi.push(p.enumerasi()?),
+            Jenis::Impl => prog.impls.push(p.impl_blok()?),
+            _ => return Err(harapan("'fn', 'struct', 'enum', atau 'impl'", t)),
+        }
     }
-    Ok(Program { fungsi })
+    Ok(prog)
 }
 
 enum Akhir {
@@ -250,6 +294,58 @@ impl<'a> Parser<'a> {
             balik,
             badan,
         })
+    }
+
+    fn struktur(&mut self) -> Result<Struktur, Kesalahan> {
+        self.maju(); // `struct`
+        let nama = self.ident("nama struct")?;
+        self.harap(Jenis::LBrace, "'{'")?;
+        let mut medan = Vec::new();
+        while self.lihat().jenis != Jenis::RBrace {
+            let n = self.ident("nama medan")?;
+            self.harap(Jenis::Colon, "':'")?;
+            let tipe = self.ident("nama tipe")?;
+            medan.push(Medan { nama: n, tipe });
+            if self.lihat().jenis == Jenis::Comma {
+                self.maju();
+            } else {
+                break;
+            }
+        }
+        self.harap(Jenis::RBrace, "'}'")?;
+        Ok(Struktur { nama, medan })
+    }
+
+    fn enumerasi(&mut self) -> Result<Enumerasi, Kesalahan> {
+        self.maju(); // `enum`
+        let nama = self.ident("nama enum")?;
+        self.harap(Jenis::LBrace, "'{'")?;
+        let mut varian = Vec::new();
+        while self.lihat().jenis != Jenis::RBrace {
+            varian.push(self.ident("nama varian")?);
+            if self.lihat().jenis == Jenis::Comma {
+                self.maju();
+            } else {
+                break;
+            }
+        }
+        self.harap(Jenis::RBrace, "'}'")?;
+        Ok(Enumerasi { nama, varian })
+    }
+
+    fn impl_blok(&mut self) -> Result<Impl, Kesalahan> {
+        self.maju(); // `impl`
+        let untuk = self.ident("nama tipe")?;
+        self.harap(Jenis::LBrace, "'{'")?;
+        let mut fungsi = Vec::new();
+        while self.lihat().jenis != Jenis::RBrace {
+            if self.lihat().jenis != Jenis::Fn {
+                return Err(harapan("'fn' atau '}'", self.lihat()));
+            }
+            fungsi.push(self.fungsi()?);
+        }
+        self.maju(); // `}`
+        Ok(Impl { untuk, fungsi })
     }
 
     fn pernyataan_let(&mut self) -> Result<Pernyataan, Kesalahan> {
@@ -602,6 +698,9 @@ fn deskripsi(j: &Jenis) -> String {
         Jenis::While => "'while'".to_string(),
         Jenis::Return => "'return'".to_string(),
         Jenis::For => "'for'".to_string(),
+        Jenis::Struct => "'struct'".to_string(),
+        Jenis::Enum => "'enum'".to_string(),
+        Jenis::Impl => "'impl'".to_string(),
         Jenis::In => "'in'".to_string(),
         Jenis::DotDot => "'..'".to_string(),
         Jenis::DotDotEq => "'..='".to_string(),
@@ -1206,5 +1305,93 @@ mod tests {
     fn rentang_sebagai_sasaran_penugasan_ditolak() {
         let e = parse("a..b = 1").unwrap_err();
         assert_eq!(e.pesan, "sasaran penugasan harus berupa nama");
+    }
+
+    fn medan(n: &str, t: &str) -> Medan {
+        Medan {
+            nama: n.to_string(),
+            tipe: t.to_string(),
+        }
+    }
+
+    #[test]
+    fn struct_dengan_medan_dan_koma_akhir() {
+        let p = prog("struct Titik { x: i32, y: i32, }").unwrap();
+        assert_eq!(
+            p.struktur,
+            vec![Struktur {
+                nama: "Titik".to_string(),
+                medan: vec![medan("x", "i32"), medan("y", "i32")],
+            }]
+        );
+        let p = prog("struct T { a: f64 }\nstruct K {}").unwrap();
+        assert_eq!(p.struktur.len(), 2);
+        assert!(p.struktur[1].medan.is_empty());
+    }
+
+    #[test]
+    fn enum_dengan_varian_dan_koma_akhir() {
+        let p = prog("enum Arah { Atas, Bawah, Kiri, }").unwrap();
+        assert_eq!(p.enumerasi[0].nama, "Arah");
+        assert_eq!(p.enumerasi[0].varian, vec!["Atas", "Bawah", "Kiri"]);
+        assert!(prog("enum Kosong {}").unwrap().enumerasi[0]
+            .varian
+            .is_empty());
+    }
+
+    #[test]
+    fn impl_berisi_fungsi() {
+        let p = prog("impl Titik { fn nol() -> i32 { 0 }\nfn satu() -> i32 { 1 } }").unwrap();
+        assert_eq!(p.impls[0].untuk, "Titik");
+        assert_eq!(p.impls[0].fungsi.len(), 2);
+        assert_eq!(p.impls[0].fungsi[1].nama, "satu");
+        assert!(prog("impl K {}").unwrap().impls[0].fungsi.is_empty());
+    }
+
+    #[test]
+    fn deklarasi_campuran_dikelompokkan_per_jenis() {
+        let p =
+            prog("fn a() {}\nstruct S {}\nenum E { X }\nimpl S { fn b() {} }\nfn c() {}").unwrap();
+        assert_eq!(p.fungsi.len(), 2);
+        assert_eq!(p.struktur.len(), 1);
+        assert_eq!(p.enumerasi.len(), 1);
+        assert_eq!(p.impls.len(), 1);
+    }
+
+    #[test]
+    fn struct_medan_tanpa_tipe_atau_tanpa_koma_ditolak() {
+        let e = prog("struct S { a }").unwrap_err();
+        assert_eq!(e.pesan, "diharapkan ':', ditemukan '}'");
+        let e = prog("struct S { a: i32 b: i32 }").unwrap_err();
+        assert_eq!(e.pesan, "diharapkan '}', ditemukan nama 'b'");
+    }
+
+    #[test]
+    fn struct_enum_tanpa_nama_atau_tidak_ditutup_ditolak() {
+        let e = prog("struct { }").unwrap_err();
+        assert_eq!(e.pesan, "diharapkan nama struct, ditemukan '{'");
+        let e = prog("enum E { A, B").unwrap_err();
+        assert_eq!(e.pesan, "diharapkan '}', ditemukan akhir berkas");
+        let e = prog("enum E { 1 }").unwrap_err();
+        assert_eq!(e.pesan, "diharapkan nama varian, ditemukan angka '1'");
+    }
+
+    #[test]
+    fn impl_berisi_selain_fn_ditolak() {
+        let e = prog("impl S { let x = 1 }").unwrap_err();
+        assert_eq!(e.pesan, "diharapkan 'fn' atau '}', ditemukan 'let'");
+        let e = prog("impl S { fn f() {}").unwrap_err();
+        assert_eq!(e.pesan, "diharapkan 'fn' atau '}', ditemukan akhir berkas");
+        let e = prog("impl { }").unwrap_err();
+        assert_eq!(e.pesan, "diharapkan nama tipe, ditemukan '{'");
+    }
+
+    #[test]
+    fn tingkat_atas_selain_deklarasi_menyebut_semua_jenis() {
+        let e = prog("1 + 2").unwrap_err();
+        assert_eq!(
+            e.pesan,
+            "diharapkan 'fn', 'struct', 'enum', atau 'impl', ditemukan angka '1'"
+        );
     }
 }

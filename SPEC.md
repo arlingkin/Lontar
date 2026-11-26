@@ -20,9 +20,12 @@ Lontar adalah bahasa pemrograman bertipe statis dengan sintaks familier bagi pen
 
 ## Tata bahasa yang sudah didukung parser
 ```
-program    := fn*
+program    := (fn | struct | enum | impl)*
 fn         := 'fn' nama '(' [param (',' param)* [',']] ')' ['->' tipe] blok
 param      := nama ':' tipe
+struct     := 'struct' nama '{' [medan (',' medan)* [',']] '}';  medan := nama ':' tipe
+enum       := 'enum' nama '{' [nama (',' nama)* [',']] '}'    // varian tanpa data
+impl       := 'impl' nama '{' fn* '}'
 blok       := '{' (pernyataan | ';')* [ekspr] '}'     // ekspr terakhir tanpa ';' = nilai blok
 pernyataan := 'let' ['mut'] nama [':' tipe] '=' ekspr | ekspr
 ekspr      := 'return' [ekspr] | nama '=' ekspr | rentang   // penugasan: asosiatif kanan, terendah
@@ -43,7 +46,7 @@ Tipe saat ini hanya nama sederhana (mis. `i32`). Operator biner asosiatif kiri.
 Pernyataan berakhir di `;`, di `}`, atau saat token berikutnya berada di baris lebih baru. Dua pernyataan dalam satu baris wajib dipisah `;`. `(` hanya memulai panggilan jika satu baris dengan token sebelumnya. Operator biner tetap melanjutkan ekspresi lintas baris. `return` tanpa nilai jika diikuti `;`, `}`, `)`, `,`, akhir berkas, atau baris baru; `else` boleh di baris baru setelah `}`.
 
 ## Belum didukung
-penugasan ke sasaran selain nama (mis. `a.b = e`), `let` tanpa nilai awal, `struct`/`enum`/`impl`/`match`, akses `.`, string dan char, tipe majemuk (`&T`, generik).
+penugasan ke sasaran selain nama (mis. `a.b = e`), `let` tanpa nilai awal, `match`, varian enum berdata, `self`/metode dengan penerima, akses `.`, string dan char, tipe majemuk (`&T`, generik).
 
 ## Arsitektur kompiler
 Sumber -> lexer -> parser dan AST -> pemeriksa tipe -> IR sederhana -> backend.

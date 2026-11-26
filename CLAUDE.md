@@ -57,7 +57,7 @@ Format tetap:
 ```
 Peta milestone: M0 kerangka repo (selesai); M1 lexer (selesai); M2 parser
 (ekspresi, let, blok, fn, operator logika, panggilan, if/while/for/return/penugasan
-selesai; berikutnya struct/enum/impl); M3 pemeriksa tipe dasar;
+struct/enum/impl tingkat atas); M3 pemeriksa tipe dasar;
 M4 IR; M5 backend JS; M6 struct/enum/match; M7 backend Python lalu C; M8 CLI,
 stdlib mini, playground.
 ROADMAP.md di repo adalah sumber kebenaran. Perbarui di commit yang sama dengan

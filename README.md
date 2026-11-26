@@ -4,7 +4,7 @@ Lontar adalah bahasa pemrograman buatan sendiri: sintaks mirip Rust, tetapi lebi
 
 ## Status
 
-Lontar masih tahap awal. Yang sudah jalan: **lexer** dan **parser** (sampai ekspresi, `let`, blok, `fn`, panggilan fungsi, `if`/`else`, `while`, `for`, `return`, penugasan). Belum ada pemeriksa tipe, IR, backend, maupun cara menjalankan program Lontar. `cargo run` baru mencetak versi.
+Lontar masih tahap awal. Yang sudah jalan: **lexer** dan **parser** (sampai ekspresi, `let`, blok, `fn`, panggilan fungsi, `if`/`else`, `while`, `for`, `return`, penugasan, serta deklarasi `struct`, `enum`, `impl`). Belum ada pemeriksa tipe, IR, backend, maupun cara menjalankan program Lontar. `cargo run` baru mencetak versi.
 
 Detail kemajuan ada di [ROADMAP.md](ROADMAP.md), rancangan bahasa di [SPEC.md](SPEC.md).
 
@@ -71,7 +71,7 @@ kesalahan di baris 1, kolom 7: diharapkan nama parameter, ditemukan '{'
 | `src/main.rs` | `main` | Biner `lontar`; sementara hanya mencetak `salam()`. |
 | `src/kesalahan.rs` | `Kesalahan` | Kesalahan kompilasi (`pesan`, `baris`, `kolom`), tampil sebagai `kesalahan di baris B, kolom K: pesan`. |
 | `src/lexer.rs` | `tokenisasi`, `Token`, `Jenis` | Mengubah teks sumber menjadi token berposisi: angka (Int/Float), nama, kata kunci, operator, pemisah, komentar `//` dilewati. Token terakhir selalu `Eof`. |
-| `src/parser.rs` | `parse_ekspr`, `parse_program`, `Ekspr`, `Pernyataan`, `Blok`, `Fungsi`, `Program`, `Op` | Mengubah token menjadi AST. `parse_ekspr` mengurai satu ekspresi; `parse_program` mengurai deretan `fn` tingkat atas. |
+| `src/parser.rs` | `parse_ekspr`, `parse_program`, `Ekspr`, `Pernyataan`, `Blok`, `Fungsi`, `Struktur`, `Enumerasi`, `Impl`, `Program`, `Op` | Mengubah token menjadi AST. `parse_ekspr` mengurai satu ekspresi; `parse_program` mengurai deretan `fn`, `struct`, `enum`, dan `impl` tingkat atas. |
 | `tests/dasar.rs` | tes integrasi | Memastikan biner mencetak nama dan versi. |
 | `Cargo.toml`, `Cargo.lock` | | Konfigurasi proyek (edition 2021, tanpa dependensi). |
 | `.github/workflows/ci.yml` | | CI GitHub Actions: `cargo fmt --check`, `cargo build`, `cargo test` pada Rust 1.75.0 dan stable, dijalankan setiap push ke `main` dan pada PR. |
