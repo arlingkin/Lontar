@@ -18,11 +18,36 @@ Lontar adalah bahasa pemrograman bertipe statis dengan sintaks familier bagi pen
 - Titik koma opsional.
 - Diagnostik menyertakan baris dan kolom serta menggunakan bahasa Indonesia.
 
+## Tata bahasa yang sudah didukung parser
+```
+program    := fn*
+fn         := 'fn' nama '(' [param (',' param)* [',']] ')' ['->' tipe] blok
+param      := nama ':' tipe
+blok       := '{' (pernyataan | ';')* [ekspr] '}'     // ekspr terakhir tanpa ';' = nilai blok
+pernyataan := 'let' ['mut'] nama [':' tipe] '=' ekspr | ekspr
+ekspr      := atau;  atau := dan ('||' dan)*;  dan := banding ('&&' banding)*
+banding    := tambah (('==' | '!=' | '<' | '<=' | '>' | '>=') tambah)*
+tambah     := kali (('+' | '-') kali)*;  kali := unary (('*' | '/' | '%') unary)*
+unary      := ('-' | '!') unary | panggilan
+panggilan  := primer ('(' [ekspr (',' ekspr)* [',']] ')')*
+primer     := Int | Float | 'true' | 'false' | nama | '(' ekspr ')' | blok
+```
+Tipe saat ini hanya nama sederhana (mis. `i32`). Operator biner asosiatif kiri.
+
+## Aturan titik koma opsional
+Pernyataan berakhir di `;`, di `}`, atau saat token berikutnya berada di baris lebih baru. Dua pernyataan dalam satu baris wajib dipisah `;`. `(` hanya memulai panggilan jika satu baris dengan token sebelumnya. Operator biner tetap melanjutkan ekspresi lintas baris.
+
+## Belum didukung
+`if`/`else`, `while`, `for`, `return`, penugasan `x = e`, `let` tanpa nilai awal, `struct`/`enum`/`impl`/`match`, akses `.`, string dan char, tipe majemuk (`&T`, generik).
+
 ## Arsitektur kompiler
 Sumber -> lexer -> parser dan AST -> pemeriksa tipe -> IR sederhana -> backend.
 
 ## Tahapan backend
 Backend awal akan dipilih setelah bentuk IR ditetapkan. JavaScript merupakan kandidat pertama; backend lain ditambahkan berdasarkan kebutuhan dan tes.
+
+## Verifikasi
+Tes tiap tahap dijalankan oleh CI GitHub Actions (`.github/workflows/ci.yml`) pada setiap push ke `main`: `cargo fmt --check`, `cargo build`, `cargo test` pada Rust 1.75.0 dan stable. Fitur dianggap selesai setelah CI hijau.
 
 ## Di luar cakupan fondasi
 Self-hosting, borrow checker, lifetime, dan pustaka standar luas tidak termasuk tahap awal.
