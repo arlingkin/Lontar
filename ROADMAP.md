@@ -2,7 +2,7 @@
 ## Status singkat
 M0 (fondasi), M1 (lexer), dan M2 sampai langkah 3 (ekspresi lengkap, `let`, blok, `fn`) selesai dan M2 langkah 4 (`if`/`else`, `while`, `return`, penugasan) selesai dan CI hijau pada e278bf1. M2 langkah 5 (`for x in a..b`/`..=`) selesai: fmt bersih, 0 warning, 70 tes lulus; CI Actions hijau pada a6891a0.
 M2 langkah 6 (`struct`/`enum`/`impl` tingkat atas) selesai: fmt bersih, 0 warning, 78 tes lulus; CI Actions hijau pada 017a5ef. **M2 (parser) selesai.**
-Berikutnya M3 pemeriksa tipe dasar.
+M3 pemeriksa tipe dasar dimulai: aturan tipe operator di `src/tipe.rs` (lokal 86 tes lulus; CI menunggu).
 ## Keputusan desain
 - Implementasi kompiler ditulis dalam Rust; bahasa Lontar mengambil sintaks yang familier dari Rust tanpa borrow checker dan lifetime.
 - Pipeline: sumber -> lexer -> parser/AST -> pemeriksa tipe -> IR -> backend.
@@ -25,10 +25,13 @@ Berikutnya M3 pemeriksa tipe dasar.
 - [x] 2026-11-26: M2 langkah 5 parser: `for nama in ekspr { .. }` dan rentang `a..b`/`a..=b` (di atas penugasan, di bawah `||`; tanpa rantai; kedua ujung wajib). 8 tes baru; total 70 lulus, fmt bersih, 0 warning; CI hijau pada a6891a0.
 - [x] 2026-11-26: M2 langkah 6 parser: `struct Nama { a: T, }`, `enum Nama { A, B, }` (varian tanpa data), `impl Nama { fn .. }` tingkat atas; `Program` kini punya `struktur`, `enumerasi`, `impls` (dikelompokkan per jenis). 8 tes baru; total 78 lulus, fmt bersih, 0 warning; CI hijau pada 017a5ef. M2 selesai.
 - [x] 2026-11-26: Ikon proyek `icon.png` (512x512) dan ditampilkan rata tengah di bagian atas `README.md`.
+- [ ] 2026-11-27: M3 langkah 1: `src/tipe.rs` (`Tipe` = `Int`/`Float`/`Bool`/`Unit`; `dari_nama`; `tipe_biner`, `tipe_negasi`, `tipe_tidak`), aturan di SPEC.md. 8 tes baru; lokal 86 lulus, fmt bersih, 0 warning. Centang `[x]` setelah CI hijau.
 ## Berikutnya
-1. M3: Pemeriksa tipe dasar (mulai dari tabel simbol dan tipe literal/operator; tentukan cakupan tipe awal lebih dulu).
+1. Konfirmasi CI hijau untuk M3 langkah 1, lalu M3 langkah 2: pemeriksa ekspresi (`periksa_ekspr` dengan lingkungan variabel) memakai `tipe.rs`. Keputusan terbuka: posisi pada AST (lihat Ide / Utang teknis).
 2. M4: IR sederhana.
 ## Ide / Utang teknis
+- Keputusan terbuka (M3): AST belum membawa baris:kolom, sehingga kesalahan tipe belum bisa berposisi. Usul bawaan: tambah `Posisi { baris, kolom }` pada `Ekspr`/`Pernyataan` lewat pembungkus tipis (mis. `Ekspr` jadi struct berisi `jenis` dan `pos`) di langkah tersendiri sebelum pemeriksa penuh; semua tes AST perlu disesuaikan. Alternatif: pesan berkonteks nama fungsi tanpa posisi.
+- Tipe awal menyatukan semua ukuran bilangan (`Int`, `Float`); pisahkan (`i32` vs `i64`) bila backend membutuhkannya.
 - Parser belum mengenal akses `.`, `self`/metode dengan penerima, varian enum berdata, `match`, penugasan ke sasaran selain nama, `let` tanpa nilai awal, dan tipe non-sederhana (`&T`, generik). Operator biner melanjutkan ekspresi lintas baris (`a\n+ b` = `a + b`).
 - Lexer belum mengenal string, char, `/* */`, pemisah angka `1_000`, dan escape; tambahkan saat dibutuhkan parser.
 - Evaluasi backend pertama setelah IR; JavaScript tetap kandidat awal.

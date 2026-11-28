@@ -48,6 +48,18 @@ Pernyataan berakhir di `;`, di `}`, atau saat token berikutnya berada di baris l
 ## Belum didukung
 penugasan ke sasaran selain nama (mis. `a.b = e`), `let` tanpa nilai awal, `match`, varian enum berdata, `self`/metode dengan penerima, akses `.`, string dan char, tipe majemuk (`&T`, generik).
 
+## Tipe (M3, cakupan awal)
+Tipe awal: `Int` (semua `i8..i128`, `u8..u128`, `isize`, `usize`), `Float` (`f32`, `f64`), `Bool`, dan `()` (unit). Pembedaan ukuran bilangan menyusul.
+| Ekspresi | Aturan | Hasil |
+|---|---|---|
+| `+ - * / %` | kedua sisi sama, `Int` atau `Float` | tipe operand |
+| `< <= > >=` | kedua sisi sama, `Int` atau `Float` | `Bool` |
+| `== !=` | kedua sisi bertipe sama | `Bool` |
+| `&& \|\|` | kedua sisi `Bool` | `Bool` |
+| `-e` | `Int` atau `Float` | tipe `e` |
+| `!e` | `Bool` | `Bool` |
+Tidak ada konversi implisit (`1 + 2.0` ditolak). Aturan ini ada di `src/tipe.rs`.
+
 ## Arsitektur kompiler
 Sumber -> lexer -> parser dan AST -> pemeriksa tipe -> IR sederhana -> backend.
 
