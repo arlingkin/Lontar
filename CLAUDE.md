@@ -25,8 +25,9 @@ Sumber -> Lexer -> Parser (AST) -> Type checker -> IR sederhana -> Backend.
   setelah run CI untuk commit itu hijau.
 
 # ATURAN KERJA (WAJIB)
-1. Mulai setiap sesi dengan membaca ROADMAP.md yang saya tempel. Jika belum
-   ada, buat dulu bersama SPEC.md singkat, lalu berhenti.
+1. Mulai setiap sesi dengan membaca ROADMAP.md dari repo (atau yang saya
+   tempel) dan menjalankan RITUAL AWAL di bawah. Jika belum ada, buat dulu
+   bersama SPEC.md singkat, lalu berhenti.
 2. Kerjakan HANYA SATU langkah kecil dari ROADMAP (satu tugas, bukan satu
    milestone penuh). Jangan menulis seluruh proyek sekaligus.
 3. Jangan kirim ulang berkas yang tidak berubah. Untuk perubahan kecil, tampilkan
@@ -45,6 +46,35 @@ Sumber -> Lexer -> Parser (AST) -> Type checker -> IR sederhana -> Backend.
 7. Jika batas pemakaian hampir habis, berhenti di titik yang rapi dan langsung
    perbarui ROADMAP.md.
 
+# RITUAL SESI (WAJIB; tugas belum dianggap selesai bila langkah akhir dilewati)
+Tujuan: sesi berikutnya langsung paham dan bekerja, dan proyek selesai rapi.
+AWAL
+1. Ambil keadaan repo dari GitHub (clone/fetch), bukan dari ingatan chat; baca
+   CLAUDE.md, ROADMAP.md (Status, Keputusan desain, Berikutnya #1) dan bagian
+   SPEC.md yang terkait. Lihat `git log --oneline -10`: sesi lain mungkin sudah
+   mengubah repo. Jika ROADMAP tertinggal dari kode, rekonsiliasi dulu dalam
+   satu commit dokumen; ROADMAP di repo menang atas ingatan.
+2. Cek CI commit terakhir (satu panggilan API). Merah: perbaiki dulu.
+3. Kerjakan "Berikutnya #1" apa adanya (Berkas/Langkah/Selesai bila). Jangan
+   memperluas cakupan; temuan di luar tugas masuk "Ide / Utang teknis".
+AKHIR
+1. CI hijau pada SHA terakhir (cek via API); baru centang `[x]` dan catat SHA.
+2. ROADMAP.md: Status singkat; Selesai; Berikutnya (tulis ulang #1 menjadi
+   rincian siap-kerja: Tujuan, Berkas, Langkah, Selesai bila, Awas; #2-#5
+   ringkas); Peta jalan; Ide/Utang (tambah temuan, hapus yang selesai).
+3. SPEC.md jika tata bahasa, aturan tipe, IR, atau rancangan berubah (termasuk
+   "Belum didukung" dan bagian rancangan yang kini sudah diimplementasi).
+4. README.md jika ada berkas, API publik, atau perilaku baru (Status, daftar
+   kode, contoh, cara pakai). Contoh kode di README harus pernah dijalankan.
+5. CLAUDE.md bagian Peta milestone bila milestone bergeser.
+6. Cek konsistensi: jumlah tes, SHA, dan nama berkas di dokumen harus sama
+   dengan kenyataan (grep); tidak ada teks usang ("belum ada X" padahal ada).
+7. Dependensi dan versi: tanpa dependensi eksternal baru tanpa persetujuan
+   eksplisit; kode kompatibel Rust 1.75.0; `Cargo.lock` ikut di-commit; naikkan
+   `version` hanya saat milestone ditutup (commit tersendiri + README/ROADMAP).
+8. Bersihkan sesi: hapus direktori kerja dan skrip token, `unset` token.
+9. Tutup dengan FORMAT PENUTUP.
+
 # ROADMAP.md (memori antar sesi)
 Format tetap:
 ```
@@ -52,13 +82,15 @@ Format tetap:
 ## Status singkat      (2-3 baris: sudah sampai mana)
 ## Keputusan desain    (daftar keputusan yang sudah final; jangan dibuka ulang)
 ## Selesai             (checklist [x] + tanggal)
-## Berikutnya          (3-5 tugas kecil berurutan, yang pertama = tugas sesi depan)
+## Berikutnya          (3-5 tugas kecil berurutan; #1 rinci dan siap-kerja = tugas sesi depan)
+## Peta jalan sampai selesai   (milestone dan kriteria selesai masing-masing)
 ## Ide / Utang teknis
 ```
 Peta milestone: M0 kerangka repo (selesai); M1 lexer (selesai); M2 parser
 (ekspresi, let, blok, fn, operator logika, panggilan, if/while/for/return/penugasan,
-struct/enum/impl tingkat atas; selesai); M3 pemeriksa tipe dasar (mulai:
-aturan tipe operator di src/tipe.rs);
+struct/enum/impl tingkat atas; selesai); M3 pemeriksa tipe (langkah 1: aturan
+tipe operator di src/tipe.rs, selesai; langkah 2+: posisi pada AST lalu
+src/pemeriksa.rs, lihat ROADMAP); M2b susulan (string, `.`, match) sebelum M5;
 M4 IR; M5 backend JS; M6 struct/enum/match; M7 backend Python lalu C; M8 CLI,
 stdlib mini, playground.
 ROADMAP.md di repo adalah sumber kebenaran. Perbarui di commit yang sama dengan
@@ -79,3 +111,4 @@ kodenya. Tampilkan ROADMAP.md utuh di akhir sesi HANYA jika tidak bisa push.
 3. SHA sebelum dan sesudah push, serta status CI (hijau/merah/menunggu)
 4. ROADMAP.md utuh hanya jika tidak bisa push
 5. Tugas sesi berikutnya (1 baris)
+6. Ritual akhir: selesai semua atau sebutkan yang dilewati dan alasannya

@@ -60,6 +60,22 @@ Tipe awal: `Int` (semua `i8..i128`, `u8..u128`, `isize`, `usize`), `Float` (`f32
 | `!e` | `Bool` | `Bool` |
 Tidak ada konversi implisit (`1 + 2.0` ditolak). Aturan ini ada di `src/tipe.rs`.
 
+## Posisi pada AST (rancangan, sudah diputuskan; belum diimplementasi)
+`Posisi { baris, kolom }` (mulai dari 1, kolom per karakter, sama dengan lexer) = posisi token pertama node. `Ekspr` menjadi `struct { jenis: JenisEkspr, pos: Posisi }`; `PartialEq` mengabaikan `pos` agar perbandingan AST di tes tidak bergantung posisi. Langkah 2 mengerjakan `Ekspr`; langkah 3 mengerjakan deklarasi (`let`, parameter, fungsi, `struct`/`enum`/`impl`) dan nama tipe (`NamaTipe { nama, pos }`).
+
+## Pemeriksa tipe (rancangan; belum diimplementasi)
+API di `src/pemeriksa.rs`: `periksa_program(&Program) -> Result<(), Kesalahan>`, melapor kesalahan pertama. Lingkungan: tumpukan lingkup `nama -> (tipe, ubah)` dan tabel fungsi `nama -> (parameter, balik)`. Selain tabel operator di atas:
+- Literal bulat `Int`, desimal `Float`, `true`/`false` `Bool`.
+- Nama harus sudah didefinisikan: `nama 'x' belum didefinisikan`. Bayangan (`let` nama sama) diperbolehkan.
+- `let x [: T] = e`: tipe `x` = tipe `e`; anotasi harus sama dengan tipe `e` dan dikenal (`Tipe::dari_nama`), selain itu `tipe 'Foo' tidak dikenal`.
+- `x = e`: `x` harus `mut` dan tipenya sama dengan `e`.
+- Blok: tipe = tipe nilai akhir bila ada, selain itu `()`; membuka lingkup baru.
+- `if c { a } else { b }`: `c` `Bool`; tipe `a` = tipe `b` (hasil); tanpa `else`: `a` harus `()`.
+- `while c { .. }`: `c` `Bool`, hasil `()`. `for i in a..b`: `a` dan `b` `Int`, `i` bertipe `Int`, hasil `()`.
+- `return e`: tipe `e` = tipe balik fungsi (tanpa nilai: `()`).
+- Fungsi: tipe badan = tipe balik (tanpa `->`: `()`); panggilan: jumlah dan tipe argumen cocok, hasil = tipe balik.
+- Semua pesan berbahasa Indonesia dan berposisi: `kesalahan di baris B, kolom K: ...`.
+
 ## Arsitektur kompiler
 Sumber -> lexer -> parser dan AST -> pemeriksa tipe -> IR sederhana -> backend.
 
